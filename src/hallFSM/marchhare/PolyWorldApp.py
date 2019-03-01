@@ -30,7 +30,7 @@ endl    = os.linesep
 
 # == Poly2D Tkinter App ==
 
-class Poly2DApp(object):
+class Poly2DApp( object ):
     """ A Tkinter display to display 2D polygon worlds """
     
     def __init__( self , winWidth , winHeight ):
@@ -181,7 +181,7 @@ class Poly2DApp(object):
 
 if __name__ == "__main__":
     # File that runs the poly sim should import this library
-    # from PolyWorldApp import *
+    # from marchhare.PolyWorldApp import *
 
     # Create objects to add to the simulation
     hept = Poly2D.regular( 7 , 200 , [0,0] , np.pi / 17 )
