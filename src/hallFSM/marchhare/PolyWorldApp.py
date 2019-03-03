@@ -36,28 +36,29 @@ class Poly2DApp( object ):
     def __init__( self , winWidth , winHeight ):
         global FLATORIGIN
         # 1. Init Tkinter root
-        self.winWidth = winWidth
-        self.winHeight = winHeight
-        self.orgnScale = min( self.winHeight , self.winWidth ) * 2/3.0
+        self.winWidth    = winWidth
+        self.winHeight   = winHeight
+        self.orgnScale   = min( self.winHeight , self.winWidth ) * 2/3.0
         self.renderScale = 1 # 1/2.0
-        self.rootWin = Tk()
-        # self.rootWin.wm_title("Polygon Playground") # No default title
-        self.rootWin.protocol("WM_DELETE_WINDOW", self.callback_destroy)
-        self.calcFunc = [ self.dummy_calculation ] # Should really be loaded with something before running
-        self.winRunning = False
-        self.simFrame = SimFrame2D( [ [ -self.winWidth/2 , -self.winHeight/2 ] , [ self.winWidth/2 , self.winHeight/2 ] ] ) 
-        self.simFrame.name = "simFrame" # Just in case someone asks
+        self.rootWin     = Tk()
+        # 2. Set up animation
+        self.calcFunc      = [ self.dummy_calculation ] # ----------------------------- Should really be loaded with something before running
+        self.winRunning    = True # --------------------------------------------------- Then you had better go and catch it!
+        self.simFrame      = SimFrame2D( [ [ -self.winWidth/2 , -self.winHeight/2 ] , # Where the action is!
+                                           [ self.winWidth/2 , self.winHeight/2   ] ] ) 
+        self.simFrame.name = "simFrame" # --------------------------------------------- Just in case someone asks
+        self.last          = -infty # ------------------------------------------------- Init animation loop timer
+        self.stepTime      = 1000 // 24 # --------------------------------------------- Number of [ms] between frames
+        self.rootWin.protocol( "WM_DELETE_WINDOW" , self.callback_destroy ) # --------- Try to exit cleanly, but it never really works
         # 2. Set up window
-        self.canvas = Canvas(self.rootWin, width=self.winWidth, height = self.winHeight)
-        self.canvas.config(background='black')
-        self.FLATORIGIN = [self.winWidth/2, self.winHeight/2]
+        self.canvas     = Canvas( self.rootWin , width = self.winWidth , height = self.winHeight )
+        self.FLATORIGIN = [ self.winWidth/2 , self.winHeight/2 ]
         FLATORIGIN = self.FLATORIGIN
+        self.canvas.config( background = 'black' )
         self.set_stage()
         # 3. Pack window
-        self.canvas.grid(row=1, column=1)
-        # self.init_controls()
-        self.last = -infty # Init animation loop timer
-        self.stepTime = 80 # Number of ms between frames
+        self.canvas.grid( row = 1 , column = 1 )
+        
 
     def set_title( self , winTitle ):
         """ Set the title for the Tkinter window """
@@ -92,11 +93,11 @@ class Poly2DApp( object ):
         #self.controlPanel = Frame(self.rootWin) # A panel to hold the controls, has its own packing environment
         pass
         
-    def callback_destroy(self):
+    def callback_destroy( self ):
         """ Ask the window to self-destruct """
         self.winRunning = False
         self.rootWin.destroy()
-        exit()
+        #~ exit()
     
     def update_Frames(self , currFrame):
         for obj in currFrame.objs:
@@ -165,6 +166,7 @@ class Poly2DApp( object ):
         # 4.f. Update window
         self.canvas.update() 
         self.rootWin.update_idletasks()
+        
         # 4.d. Wait remainder of 40ms
         elapsed = time.time() * 1000 - self.last
         if elapsed < self.stepTime:
@@ -174,6 +176,11 @@ class Poly2DApp( object ):
         # 4.e. Mark beginning of next loop
         self.last = time.time() * 1000  
         self.rootWin.after( sleepTime , self.run )
+        
+        # 5. Shutdown if flag
+        if self.winRunning == False:
+			self.callback_destroy()
+        
 	#print "looping"
 
 
