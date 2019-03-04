@@ -267,7 +267,7 @@ class Car:
 # ~~ Init Sim ~~
 car      = Car( np.pi / 4.0 , 20 , -10 )
 _dTheta  = np.pi / 30
-_initSpd = 40 # [px/s]
+_initSpd = 60 # [px/s]
 car.set_state_XYTh( 0,0,-np.pi/2 )
 car.set_ctrl( 0 , _initSpd )
 
@@ -349,7 +349,7 @@ if __name__ == "__main__":
         car.set_state_XYTh( seq[-1][0] , seq[-1][1] , seq[-1][2] )
         
         hits = dirty_convert( car.lidar.scan( walls ) )
-        print hits
+        #print hits
         
         foo.temp_points( hits , 20 , 'red' )
         
