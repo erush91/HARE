@@ -53,7 +53,7 @@ def vec_dif_mag( vec1 , vec2 ):
     return vec_mag( np.subtract( vec1 , vec2 ) )
 
 def vec_dif_unt( vec1 , vec2 ):
-    """ Return the unit of the vector difference between 'vec1' and 'vec2' """
+    """ Return the unit vector difference between 'vec1' and 'vec2' """
     return vec_unit( np.subtract( vec1 , vec2 ) )
 
 def vec_zeros( dim ):
@@ -116,10 +116,10 @@ def vec_NaN( dim ):
     """ Return a row vector of dimension 'dim' composes of NaN """
     return [ float('NaN') for i in xrange( dim ) ]
 
-def np_add(*args): # <<< resenv
+def np_add( *args ):
     """ Perform 'np.add' on more than two args """
-    if len(args) > 2: # If there are more than 2 args, add the first arg to recur on remainder of args
-        return np.add( args[0] , np_add(*args[1:]) ) # Note the star operator is needed for recursive call, unpack to positional args
+    if len( args ) > 2: # If there are more than 2 args, add the first arg to recur on remainder of args
+        return np.add( args[0] , np_add( *args[1:] ) ) # Note the star operator is needed for recursive call, unpack to positional args
     else: # base case, there are 2 args*, use vanilla 'np.add'
         return np.add( args[0] , args[1] ) # *NOTE: This function assumes there are at least two args, if only 1 an error will occur
 

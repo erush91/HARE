@@ -80,6 +80,7 @@ class Car:
 							   [  20 , -20 ] , 
 							   [  12 ,  20 ] , 
 							   [ -12 ,  20 ] )
+		self.frame   = Frame2D( [ 0 , 0 ] , 0 )  ;  self.frame.attach_sub( self.body )
 		self.whlBase = 40 # ---------------------- Perpendicular distance between the front and rear "axles" [px] , NOT USED?
 		# ~ Controls and Their Limits ~
 		self.turnLim = [ -thetaLim   ,  thetaLim   ] # [ right , left ] steering angle limits [rad] , Symmetric
@@ -97,8 +98,8 @@ class Car:
 		self.x       = pX # --- x position 
 		self.y       = pY # --- y position
 		self.theta   = pTheta # orientation [rad] from vertical
-		self.body.set_pos( [ self.x , self.y ] )		
-		self.body.set_theta( self.theta )
+		self.frame.set_pos( [ self.x , self.y ] )		
+		self.frame.set_theta( self.theta )
 		
 	def set_ctrl( self , turnAngRad , linearVelMS ):
 		""" Set the control effort for the car , Making sure to keep control efforts within the set limits """
@@ -215,7 +216,7 @@ if __name__ == "__main__":
     foo.calcFunc = [ update_car ] # ------ Give the app work to do each frame
     
     #~ foo.attach_drawables( hept ) # ----- Add Frame2D/Poly objects to the world so that they can be drawn
-    foo.attach_drawables( car.body ) # ----- Add Frame2D/Poly objects to the world so that they can be drawn
+    foo.attach_drawables( car.frame ) # ----- Add Frame2D/Poly objects to the world so that they can be drawn
     foo.attach_drawables( *walls )
     
     foo.color_all( 'green' ) # --------- Default segment color is black 

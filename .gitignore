@@ -55,3 +55,4 @@ cmake-build-debug/
 */*/*/*/*.gz
 */*/*/*/*/*.gz
 */*/*/*/*/*/*.gz
+.ipynb_checkpoints/
