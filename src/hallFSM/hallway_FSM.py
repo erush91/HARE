@@ -173,7 +173,7 @@ class LIDAR:
         for angDex , rayAng in enumerate( self.angles ):
             clstDist = self.maxDist
             # 1.5. Construct the ray
-            rayPnt = np.add( polr_2_cart_0Y( [ self.maxDist , rayAng + self.sensor.labPose.orientation.theta ]  ) , rayOrg )
+            rayPnt = np.add( polr_2_cart_0Y( [ self.maxDist , rayAng - self.sensor.labPose.orientation.theta ]  ) , rayOrg )
             ray = [ rayOrg , rayPnt ]
             rayDir = vec_dif_unt( rayPnt , rayOrg )
             # 2. For each object in the env
@@ -316,9 +316,21 @@ walls = [ Poly2D.rectangle( scrnWdth-50            , wallThic                   
           Poly2D.rectangle( wallThic               , scrnHght-50-wallThic            , [ -scrnWdth//2+37.5 , 0 ]          , 0.0 ) ,  
           Poly2D.rectangle( wallThic               , scrnHght-50-wallThic-2*hallWdth , [ -scrnWdth//2+37.5+hallWdth , 0 ] , 0.0 ) ]
 
-car.set_state_XYTh( -scrnWdth//2 + hallWdth + 50     , 
+car.set_state_XYTh( 0                                , 
                      scrnHght//2 - hallWdth//2 - 25  ,
                     -np.pi/2                         )
+
+def dirty_convert( ptsList ):
+    """ THIS ENV IS WET TRASH """
+    rtnPts = [  ]
+    for pnt in ptsList:
+        x = pnt[0] 
+        y = pnt[1]
+        rtnPts.append( 
+            [ x + scrnWdth/2.0 , scrnHght/2.0 - y ] 
+        )
+    return rtnPts
+    
 
 if __name__ == "__main__":
     print __prog_signature__()
@@ -336,7 +348,7 @@ if __name__ == "__main__":
         
         car.set_state_XYTh( seq[-1][0] , seq[-1][1] , seq[-1][2] )
         
-        hits = foo.simFrame.pts_to_lab( car.lidar.scan( walls ) )
+        hits = dirty_convert( car.lidar.scan( walls ) )
         print hits
         
         foo.temp_points( hits , 20 , 'red' )
