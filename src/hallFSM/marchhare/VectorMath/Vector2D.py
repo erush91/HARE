@@ -34,7 +34,7 @@ infty = 1e309 # URL: http://stackoverflow.com/questions/1628026/python-infinity-
 
 # == Coordinate Transform 2D ==
 
-def polr_2_cart(polarCoords): # usual conversion # <<< resenv
+def polr_2_cart( polarCoords ): # usual conversion 
     """ Convert polar coordinates [radius , angle (radians)] to cartesian [x , y]. Theta = 0 is X+ """
     return [ polarCoords[0] * cos(polarCoords[1]) , polarCoords[0] * sin(polarCoords[1]) ]
     # TODO : Look into imaginary number transformation and perform a benchmark
@@ -238,7 +238,7 @@ def intersect_ray_seg_pnt_2D( ray , seg , endPoints = True , slideCoincident = F
 
 # TODO: Rewrite all the intersection functions this way so that we don't have to have a bunch of versions based on the needs of client code
 
-def intersect_ray_seg_pnt_frac_2D( ray , seg ): # <<< resenv
+def intersect_ray_seg_pnt_frac_2D( ray , seg ): 
     """ if 'ray' and line 'seg' intersect, then return intersection point , otherwise return false 
     endPoints = False: Ignore intersections that happen at the segment endpoints
     slideCoincident = True: Count the case where the segment and the ray are coincident as non-intersecting """
@@ -636,7 +636,7 @@ class Frame2D( Pose2D ):
     """
     
     def __init__( self , pPos , pTheta , *containedObjs ):
-        super(Frame2D, self).__init__( pPos , pTheta ) # This object inherits Pose2D, and uses position and orientation to define its state
+        super( Frame2D , self ).__init__( pPos , pTheta ) # This object inherits Pose2D, and uses position and orientation to define its state
         self.labPose = Pose2D() # The lab pose: position and orientation in the lab frame
         self.ntnPose = Pose2D() # The notional pose: Used to make "what-if" calculations without creating a new object or disturbing present coords
         self.objs = list(containedObjs) if containedObjs else [] # List of contained drawable objects
@@ -739,6 +739,12 @@ class Frame2D( Pose2D ):
         """ Express a 'vec' specified in the local frame in the lab frame """
         labRelative = self.labPose.orientation.apply_to( vec ) # This function assumes that at least one update has occurred
         return np.add( self.labPose.position , labRelative )
+        
+    def pts_to_lab( self , ptsLst ):
+        rtnPts = []
+        for pnt in ptsLst:
+            rtnPts.append( self.local_to_lab( pnt ) )
+        return rtnPts
         
     def get_lab_bases( self ):
         """ Return the origin and the basis vectors if this frame """
@@ -1036,7 +1042,7 @@ class Frame2D( Pose2D ):
         
 # - End Frame2D -        
         
-class CollideList(list):
+class CollideList( list ):
     """ Container for Poly2Ds , helper class for SimFrame , Toggle collision detection """
     # NOTE: This is not strictly required for collision detection, but could possibly help if there are groups of objects to collide
     

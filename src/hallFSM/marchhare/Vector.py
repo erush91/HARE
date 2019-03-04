@@ -24,8 +24,6 @@ import numpy as np
 # ~ Local Libraries ~
 from MathKit import eq_margin , round_small , eq
 
-# set_dbg_lvl(1) # Transformation of objects contained in Frames
-
 # ~~ Constants , Shortcuts , Aliases ~~
 EPSILON = 1e-7
 infty = 1e309 # URL: http://stackoverflow.com/questions/1628026/python-infinity-any-caveats#comment31860436_1628026
@@ -137,7 +135,7 @@ def np_subtract(*args): # <<< resenv
     else: # base case, there are 2 args*, use vanilla 'np.subtract'
         return np.subtract( args[0] , args[1] ) # *NOTE: This function assumes there are at least two args, if only 1 an error will occur
 
-def vec_sum_chain(vecList): # <<< resenv
+def vec_sum_chain( vecList ): 
     """ Create a list of vectors that are the resultants of summing correspong vector in 'vecList' and all preceding vectors """
     ptsList = [ vecList[0][:] ] # first vector is the same as first in 'vecList'
     for i in range(1,len(vecList)): # for every successive vector
@@ -196,7 +194,7 @@ def is_vector( vec ):
     """ Return true if 'vec' is any of { list , numpy array } and thus may particpate in vector operations """
     return isinstance( vec , ( list , np.ndarray ) )
 
-def vec_copy( vec ): # <<< resenv
+def vec_copy( vec ): 
     """ Return a copy of 'vec', using the appropriate copy mechanism for the underlying datatype """
     if isinstance( vec , list ): 
         return vec[:] 
@@ -205,7 +203,7 @@ def vec_copy( vec ): # <<< resenv
     else:
         raise TypeError("vec_copy: " + str(vec) + " was neither a 'list' nor a 'np.ndarray'!")
 
-def vec_copy_deep( vec ): # <<< resenv
+def vec_copy_deep( vec ): 
     """ Return a deep copy of 'vec', using the appropriate copy mechanism for the underlying datatype """
     if isinstance( vec , list ): 
         return deepcopy( vec )

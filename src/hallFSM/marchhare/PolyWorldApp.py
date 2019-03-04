@@ -18,6 +18,7 @@ Tkinter simulation environment for 2D polygons
 import os
 import time # --------- For calculating framerate
 from Tkinter import * # Standard Python cross-platform GUI
+from math import sqrt
 # ~ Special Libraries ~
 import numpy as np
 # ~ Local Libraries ~
@@ -27,6 +28,7 @@ from VectorMath.Vector2D import SimFrame2D , Segment , Poly2D
 EPSILON = 1e-7
 infty   = 1e309 # URL: http://stackoverflow.com/questions/1628026/python-infinity-any-caveats#comment31860436_1628026
 endl    = os.linesep
+sqt2    = sqrt(2)
 
 # == Poly2D Tkinter App ==
 
@@ -58,7 +60,15 @@ class Poly2DApp( object ):
         self.set_stage()
         # 3. Pack window
         self.canvas.grid( row = 1 , column = 1 )
+        # 4. Create a temp list
+        self.tempHandles = []
         
+    def flush_temp( self ):
+		""" Destroy all temp objects """
+		# URL , Delete canvas objects
+		for handle in self.tempHandles:
+			self.canvas.delete( handle ) # It is not an error to give an item specifier that doesn’t match any items.
+		self.tempHandles = []
 
     def set_title( self , winTitle ):
         """ Set the title for the Tkinter window """
@@ -148,7 +158,14 @@ class Poly2DApp( object ):
             for obj in rootFrame.objs:
                 obj.set_color( pColor )   
         for frame in rootFrame.subFrames:
-            self.color_all( pColor , frame )    
+            self.color_all( pColor , frame )
+            
+    def temp_points( self , ptsList , size , color ):
+        """ Draw circular points to the canvas """
+        side = 1/sqt2 * size/2
+        for pnt in ptsList:
+            x = pnt[0] ; y = pnt[1]
+            self.tempHandles.append(  self.canvas.create_oval( x-side , y-side , x+side , y+side , outline = color , fill = color )  )
 	
     def run( self ):
 #        for segment in self.staticSegments: # Draw world axes
@@ -161,7 +178,6 @@ class Poly2DApp( object ):
         # 4.b. Send new coords to segments
         self.simFrame.transform_contents() # one of these contains the redundant update
         self.update_Frames( self.simFrame ) # Is this the redundant update?
-        # 4.c. Take input from widgets
         
         # 4.f. Update window
         self.canvas.update() 
@@ -176,6 +192,9 @@ class Poly2DApp( object ):
         # 4.e. Mark beginning of next loop
         self.last = time.time() * 1000  
         self.rootWin.after( sleepTime , self.run )
+        
+        # 4.c. Destroy temp objects
+        self.flush_temp()
         
         # 5. Shutdown if flag
         if self.winRunning == False:
