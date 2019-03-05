@@ -1,6 +1,8 @@
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2017 Intel Corporation. All Rights Reserved.
 
+#include <ros/ros.h>
+
 // Used rs-imshow as a go-by
 #include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
 #include <opencv2/opencv.hpp>   // Include OpenCV API
@@ -13,6 +15,7 @@ using std::endl;
 
 int main(int argc, char * argv[]) try
 {
+    ros::init(argc, argv, "octomap_point_cloud_centers_fusion_node");
 
     // Declare counter
     unsigned int cnt;
