@@ -50,15 +50,20 @@ int main(int argc, char * argv[]) try
     // SET REALSENSE FRAME SIZE //
     //////////////////////////////
     
+    // D435: Use 848x480 resolution @30fps, with auto-exposure. Use post processing with downsample 2.
+    // https://github.com/IntelRealSense/librealsense/wiki/D400-Series-Visual-Presets
+   
+    // WE WANT 848 x 480 RESOLUTION AT 30 FPS
+
     // Configured depth stream
-    cfg.enable_stream(RS2_STREAM_DEPTH, 848, 480, RS2_FORMAT_Z16, 60); // 1280, 720, 30
+    cfg.enable_stream(RS2_STREAM_DEPTH, 848, 480, RS2_FORMAT_Z16, 30);
 
     // Configured left infrared stream
     // https://github.com/IntelRealSense/librealsense/issues/1140
-    cfg.enable_stream(RS2_STREAM_INFRARED, 1, 848, 480, RS2_FORMAT_Y8, 60); // 1280, 720, 30
+    cfg.enable_stream(RS2_STREAM_INFRARED, 1, 848, 480, RS2_FORMAT_Y8, 30);
     
     // Configured right infrared stream
-    cfg.enable_stream(RS2_STREAM_INFRARED, 2, 848, 480, RS2_FORMAT_Y8, 60); // 1280, 720, 30
+    cfg.enable_stream(RS2_STREAM_INFRARED, 2, 848, 480, RS2_FORMAT_Y8, 30);
 
     // Instruct pipeline to start streaming with the requested configuration
     rs2::pipeline_profile profile = pipe.start(cfg);
@@ -105,35 +110,63 @@ int main(int argc, char * argv[]) try
     // https://stackoverflow.com/questions/53520301/how-to-load-json-file-to-realsense-d435-camera-using-c-and-intel-api
     // https://github.com/IntelRealSense/librealsense/issues/1229
 
-    rs2::context ctx;
-    auto device_list = ctx.query_devices();
-    size_t device_count = device_list.size();
-    if (!device_count)
-    {
-        cout <<"No device detected. Is it plugged in?\n";
-        return EXIT_SUCCESS;
-    }
+    ///////////////////////////////////////
+    // LOAD .JSON FILE (REALSEN SETTINGS //
+    ///////////////////////////////////////
+    
+    // rs2::context ctx;
+    // auto device_list = ctx.query_devices();
+    // size_t device_count = device_list.size();
+    // if (!device_count)
+    // {
+    //     cout <<"No device detected. Is it plugged in?\n";
+    //     return EXIT_SUCCESS;
+    // }
 
-    // Get the first connected device
-    auto dev0 = device_list[0];
+    // // Get the first connected device
+    // auto dev0 = device_list[0];
 
-    // Enter advanced mode
-    if (dev0.is<rs400::advanced_mode>())
-    {
-        // Get the advanced mode functionality
-        auto advanced_mode_dev = dev0.as<rs400::advanced_mode>();
+    // // Enter advanced mode
+    // if (dev0.is<rs400::advanced_mode>())
+    // {
+    //     // Get the advanced mode functionality
+    //     auto advanced_mode_dev = dev0.as<rs400::advanced_mode>();
 
-        // Load and configure .json file to device
-        std::ifstream t("./src/depth/json/HighResHighAccuracyPreset.json");
-        std::string str((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
-        advanced_mode_dev.load_json(str);
-    }
-    else
-    {
-        cout << "Current device doesn't support advanced-mode!\n";
-        return EXIT_FAILURE;
-    }
+    //     // Load and configure .json file to device
+    //     std::ifstream t("./src/depth/json/DefaultPreset_D435.json"); //HighResHighAccuracyPreset.json
+    //     std::string str((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
+    //     advanced_mode_dev.load_json(str);
+    // }
+    // else
+    // {
+    //     cout << "Current device doesn't support advanced-mode!\n";
+    //     return EXIT_FAILURE;
+    // }
 
+    //////////////////////////////////////
+    // CONFIGURE AUTO EXPOSURE SETTINGS //
+    //////////////////////////////////////
+    
+    // TO DO
+
+    // WE WANT TO TURN ON AUTO EXPOSURE
+    // https://github.com/IntelRealSense/librealsense/wiki/D400-Series-Visual-Presets
+    
+    // NOT SURE HOW TO DO THIS, FORUMS SUGGEST POINTS
+    // https://software.intel.com/sites/landingpage/realsense/camera-sdk/v1.1/documentation/html/member_functions_neutral_device_pxccapture.html
+    // https://github.com/IntelRealSense/librealsense/issues/1542
+    //dev->EnableAutoExposure(1.0f);
+    //static rs2_option get_sensor_option(const dev& AutoExposure);
+
+    //////////////////////////////////////
+    // CONFIGURE DOWN SAMPLING SETTINGS //
+    //////////////////////////////////////
+
+    // TO DO
+
+    // WE WANT TO DOWNSAMPLE 2.
+    // https://github.com/IntelRealSense/librealsense/wiki/D400-Series-Visual-Presets
+    
     ////////////////////////////////////////////
     // CONFIGURE IMSHOW VISUALIZATION WINDOWS //
     ////////////////////////////////////////////
@@ -291,9 +324,9 @@ int main(int argc, char * argv[]) try
         /////////////////////////////////////////
         
         // Update the window with new frame
-        cv::imshow(window_name_depth, mat_depth_RGB_8bit);
-		cv::imshow(window_name_infrared_left, mat_infrared_left);
-		cv::imshow(window_name_infrared_right, mat_infrared_right);
+        //cv::imshow(window_name_depth, mat_depth_RGB_8bit);
+		//cv::imshow(window_name_infrared_left, mat_infrared_left);
+		//cv::imshow(window_name_infrared_right, mat_infrared_right);
         
         /////////////////////////////////////////
         // PRINT DEPTH FRAME SIZE TO TERIMINAL //
