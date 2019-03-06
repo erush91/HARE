@@ -1,7 +1,16 @@
-// License: Apache 2.0. See LICENSE file in root directory.
-// Copyright(c) 2017 Intel Corporation. All Rights Reserved.
+///////////////////////////////////////////////////////////////////////////////
+// Function Name : depth
+// Purpose : ROS publisher for depth, infra1, and infra2 images
+///////////////////////////////////////////////////////////////////////////////
+// Changelog :
+// Date           % Name       %   Reason
+// 03 / 04 / 2019 % Gene Rush  %   Created code
+// 03 / 06 / 2019 % Gene Rush  %   Added this comment block
+///////////////////////////////////////////////////////////////////////////////
 
 #include <ros/ros.h>
+
+#include "std_msgs/String.h"
 
 // Used rs-imshow as a go-by
 #include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
@@ -11,20 +20,24 @@
 
 #include <cv_bridge/cv_bridge.h> // Bridge between OpenCV and ROS
 
+#include <librealsense2/rs.hpp>
+#include <librealsense2/rs_advanced_mode.hpp>
+
 // https://stackoverflow.com/questions/19331575/cout-and-endl-errors
 using std::cout;
 using std::endl;
 
 int main(int argc, char * argv[]) try
 {
-    /////////////////////////////
-    // REALSENSE CONFIGURATION //
-    /////////////////////////////
+
+    //////////////////////////
+    // INITIALIZE REALSENSE //
+    //////////////////////////
 
     // Declare counter
-    unsigned int cnt;
-    
-    // Declare depth colorizer for pretty visualization of depth data
+    unsigned int cnt = 0;
+
+    // Declare depth colorizer for pretty visualization of depth frame
     rs2::colorizer color_map;
 
     // Declare RealSense pipeline, encapsulating the actual device and sensors
@@ -33,76 +46,174 @@ int main(int argc, char * argv[]) try
     // Create a configuration for configuring the pipeline with a non default profile
     rs2::config cfg;
 
+    //////////////////////////////
+    // SET REALSENSE FRAME SIZE //
+    //////////////////////////////
+    
     // Configured depth stream
-    cfg.enable_stream(RS2_STREAM_DEPTH, 640, 480, RS2_FORMAT_Z16, 60);
+    cfg.enable_stream(RS2_STREAM_DEPTH, 848, 480, RS2_FORMAT_Z16, 60); // 1280, 720, 30
 
     // Configured left infrared stream
-    cfg.enable_stream(RS2_STREAM_INFRARED, 1, 640, 480, RS2_FORMAT_Y8, 60);
+    // https://github.com/IntelRealSense/librealsense/issues/1140
+    cfg.enable_stream(RS2_STREAM_INFRARED, 1, 848, 480, RS2_FORMAT_Y8, 60); // 1280, 720, 30
     
     // Configured right infrared stream
-    cfg.enable_stream(RS2_STREAM_INFRARED, 2, 640, 480, RS2_FORMAT_Y8, 60);
+    cfg.enable_stream(RS2_STREAM_INFRARED, 2, 848, 480, RS2_FORMAT_Y8, 60); // 1280, 720, 30
 
-    //Instruct pipeline to start streaming with the requested configuration
-    //pipe.start(cfg);
-
-    // Start streaming with default recommended configuration
+    // Instruct pipeline to start streaming with the requested configuration
     rs2::pipeline_profile profile = pipe.start(cfg);
-    
+
+    /////////////////////////////////
+    // GET REALSENSE DEPTH SCALING //
+    /////////////////////////////////
+
     // Find device
-    rs2::device dev = profile.get_device();
-    
-    // Find depth sensor 
     // https://github.com/IntelRealSense/librealsense/wiki/API-How-To
-    rs2::depth_sensor ds = dev.first<rs2::depth_sensor>();//front().as<depth_sensor>();
-    
-    // Find depth sensor scaling factor
-    float scale = ds.get_depth_scale();
+    auto dev = profile.get_device();
 
+    // Find first depth sensor (device_list can have zero or more then one)
+    // https://github.com/IntelRealSense/librealsense/wiki/API-How-To
+    auto depth_sensor = dev.first<rs2::depth_sensor>();
+
+    // Find depth scale (to meters)
+    auto scale =  depth_sensor.get_depth_scale();
+
+    //////////////////////////////////
+    // CONFIGURE REALSENSE SETTINGS //
+    //////////////////////////////////
+
+    // How to load json files
+    // https://github.com/IntelRealSense/librealsense/issues/1021
+
+    // Provides json files for different applications
+    // https://github.com/IntelRealSense/librealsense/wiki/D400-Series-Visual-Presets
+    // https://github.com/IntelRealSense/librealsense/issues/1235
+
+    // Miscellaneous forums
+    // https://github.com/IntelRealSense/librealsense/issues/2193
+    // https://github.com/IntelRealSense/librealsense/issues/1171
+    // https://github.com/IntelRealSense/librealsense/issues/1235
+
+    // White paper
+    // https://www.intel.com/content/www/us/en/support/articles/000027833/emerging-technologies/intel-realsense-technology.html
+    // https://www.intel.com/content/dam/support/us/en/documents/emerging-technologies/intel-realsense-technology/BKMs_Tuning_RealSense_D4xx_Cam.pdf
+
+    // https://stackoverflow.com/questions/53520301/how-to-load-json-file-to-realsense-d435-camera-using-c-and-intel-api
+    // Obtain a list of device_list currently present on the system
+
+    // Load camera settings (.json file)
+    // https://stackoverflow.com/questions/53520301/how-to-load-json-file-to-realsense-d435-camera-using-c-and-intel-api
+    // https://github.com/IntelRealSense/librealsense/issues/1229
+
+    rs2::context ctx;
+    auto device_list = ctx.query_devices();
+    size_t device_count = device_list.size();
+    if (!device_count)
+    {
+        cout <<"No device detected. Is it plugged in?\n";
+        return EXIT_SUCCESS;
+    }
+
+    // Get the first connected device
+    auto dev0 = device_list[0];
+
+    // Enter advanced mode
+    if (dev0.is<rs400::advanced_mode>())
+    {
+        // Get the advanced mode functionality
+        auto advanced_mode_dev = dev0.as<rs400::advanced_mode>();
+
+        // Load and configure .json file to device
+        std::ifstream t("./src/depth/json/HighResHighAccuracyPreset.json");
+        std::string str((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
+        advanced_mode_dev.load_json(str);
+    }
+    else
+    {
+        cout << "Current device doesn't support advanced-mode!\n";
+        return EXIT_FAILURE;
+    }
+
+    ////////////////////////////////////////////
+    // CONFIGURE IMSHOW VISUALIZATION WINDOWS //
+    ////////////////////////////////////////////
+        
     using namespace cv;
-    const auto window_name = "Display Image";
-    namedWindow(window_name, WINDOW_AUTOSIZE);
+    const auto window_name_depth = "Depth";
+    namedWindow(window_name_depth, WINDOW_AUTOSIZE);
+    
+    const auto window_name_infrared_left = "IR (Left)";
+    namedWindow(window_name_infrared_left, WINDOW_AUTOSIZE);
 
-    ///////////////////////
-    // ROS CONFIGURATION //
-    ///////////////////////
+    const auto window_name_infrared_right = "IR (Right)";
+    namedWindow(window_name_infrared_right, WINDOW_AUTOSIZE);
+    
+    /////////////////////////////
+    // CONFIGURE ROS PUBLISERS //
+    /////////////////////////////
 
-    // Publish sensor_msgs::Image from cv::Mat
+    // Publish sensor_msgs::Image
     // https://answers.ros.org/question/99831/publish-file-to-image-topic/
     ros::init(argc, argv, "depth_node");
     ros::NodeHandle nh;
 
-    ros::Publisher pub = nh.advertise<sensor_msgs::Image>("/static_image", 1);
-    ros::Rate loop_rate(60); // currently RealSense defaults to 30 FPS
+    ros::Publisher pub_image_depth = nh.advertise<sensor_msgs::Image>("/camera/depth/image_raw", 1);
+    ros::Publisher pub_image_infrared_left = nh.advertise<sensor_msgs::Image>("/camera/infra1/image_raw", 1);
+    ros::Publisher pub_image_infrared_right = nh.advertise<sensor_msgs::Image>("/camera/infra2/image_raw", 1);
+    
+    //////////////////////////
+    // GET REALSENSE FRAMES //
+    //////////////////////////
 
-    /////////////////////
-    // FRAME RATE LOOP //
-    /////////////////////
-
-    while (nh.ok() && waitKey(1) < 0 && cvGetWindowHandle(window_name)) 
+    while (nh.ok() && waitKey(1) < 0) 
     {
+        ///////////////////////////////
+        // PRINT FRAME # TO TERMINAL //
+        ///////////////////////////////
+
+        cnt++;
+        cout << "Frame # " << cnt << endl;
+
         //////////////////////////////
         // WAIT FOR REALSENSE FRAME //
         //////////////////////////////
-
-        // Wait for next set of frames from the camera
-        rs2::frameset data = pipe.wait_for_frames();
-
-        /////////////////////
-        // GET DEPTH IMAGE //
-        /////////////////////
-
-        // Get depth image data
-        rs2::frame depth = data.get_depth_frame();
-
-        // Convert to depth image data to RGB colormap
-        rs2::frame depth_RGB = depth.apply_filter(color_map);
         
+        // Wait for next set of frames from the camera
+        rs2::frameset frame_set = pipe.wait_for_frames();
+
+        //////////////////////////////
+        // GET IMAGES FROM FRAMESET //
+        //////////////////////////////
+
+        rs2::frame frame_depth = frame_set.get_depth_frame();
+        rs2::frame frame_depth_RGB = frame_depth.apply_filter(color_map); // Convert to depth image frame to RGB colormap
+		rs2::video_frame frame_infrared_left = frame_set.get_infrared_frame(1);
+		rs2::video_frame frame_infrared_right = frame_set.get_infrared_frame(2);
+
+        ////////////////////////////////////
+        // QUERY FRAME WIDTHS AND HEIGHTS //
+        ////////////////////////////////////
+
         // Query frame size (width and height)
-        const int w = depth.as<rs2::video_frame>().get_width();
-        const int h = depth.as<rs2::video_frame>().get_height();
+        const int w_depth = frame_depth.as<rs2::video_frame>().get_width();
+        const int h_depth = frame_depth.as<rs2::video_frame>().get_height();
+        const int w_infrared1 = frame_infrared_left.as<rs2::video_frame>().get_width();
+        const int h_infrared1 = frame_infrared_left.as<rs2::video_frame>().get_height();
+        const int w_infrared2 = frame_infrared_right.as<rs2::video_frame>().get_width();
+        const int h_infrared2 = frame_infrared_right.as<rs2::video_frame>().get_height();
+
+        ////////////////////////////////////////
+        // SEND FRAME DATA TO OPENCV MATRICES //
+        ////////////////////////////////////////
 
         // Create OpenCV matrix for imshow (RGB visualization)
-        cv::Mat depth_image_8bit_RGB(Size(w, h), CV_8UC3, (void*)depth_RGB.get_data(), Mat::AUTO_STEP);
+        cv::Mat mat_depth_RGB_8bit(Size(w_depth, h_depth), CV_8UC3, (void*)frame_depth_RGB.get_data(), Mat::AUTO_STEP);
+        cv::Mat mat_infrared_left(Size(w_infrared1, h_infrared1), CV_8UC1, (void*)frame_infrared_left.get_data(), Mat::AUTO_STEP);
+        cv::Mat mat_infrared_right(Size(w_infrared2, h_infrared2), CV_8UC1, (void*)frame_infrared_right.get_data(), Mat::AUTO_STEP); 
+
+        ////////////////////////////////////
+        // EXTRACT ROW DATA FROM MATRICES //
+        ////////////////////////////////////
 
         // Obtain scaled 16-bit matrix for calculations
         // https://stackoverflow.com/questions/6909464/convert-16-bit-depth-cvmat-to-8-bit-depth
@@ -120,9 +231,9 @@ int main(int argc, char * argv[]) try
         //cv::Mat depth_vector_float_m(Size(w, 0), CV_32F);
         //depth_vector_float_m.push_back(depth_image_float_m.row(h-1));
             
-        // Print out data
+        // Print out frame
         if (cnt == 100)
-        {	
+        {
             //cout << "scale = "<< endl << " "  << scale << endl << endl;
             //cout << "w = "<< endl << " "  << w << endl << endl;
             //cout << "h = "<< endl << " "  << h << endl << endl;
@@ -130,59 +241,85 @@ int main(int argc, char * argv[]) try
             // https://stackoverflow.com/questions/7970988/print-out-the-values-of-a-mat-matrix-in-opencv-c
             //cout << "\n\n\n\n\n\n\n\n\n\n depth image [m] = "<< endl << " "  << depth_image_float_m << endl << endl;
             //cout << "\n\n\n\n\n\n\n\n\n\n depth vector [m] = "<< endl << " "  << depth_vector_float_m << endl << endl;
+            
+            //cnt = 0;
+        }
+            /*
+            int main(int argc, char **argv) 
+            {
+                const int num_points = 5;
+                const int vec_length = 3;
+                cv::Mat A(num_points, vec_length, CV_32FC1);
+                cv::RNG rng(0); // Fill A with random values
+                rng.fill(A, cv::RNG::UNIFORM, 0, 1);
+                cv::Mat B = cv::Mat(0,vec_length, CV_32FC1);
+                B.push_back(A.row(0));
+                B.push_back(A.row(2));
+                B.push_back(A.row(4));
+                std::cout << "A: " << A << std::endl;
+                std::cout << "B: " << B << std::endl;
+                return 0;
+            }    
+            */
 
-            cnt = 0;
+        //////////////////////////////////////////
+        // CONVERT CV:MAT to SENSOR_MSGS::IMAGE //
+        //////////////////////////////////////////
+
+        // http://wiki.ros.org/cv_bridge/Tutorials/UsingCvBridgeToConvertBetweenROSImagesAndOpenCVImages
+
+        cv_bridge::CvImage cv_image_depth;
+        cv_image_depth.image = mat_depth_RGB_8bit;
+        cv_image_depth.encoding = "bgr8";
+        sensor_msgs::Image ros_image_depth;
+        cv_image_depth.toImageMsg(ros_image_depth);
+
+        cv_bridge::CvImage cv_image_infrared_left;
+        cv_image_infrared_left.image = mat_infrared_left;
+        cv_image_infrared_left.encoding = "mono8";
+        sensor_msgs::Image ros_image_infrared_left;
+        cv_image_infrared_left.toImageMsg(ros_image_infrared_left);
+
+        cv_bridge::CvImage cv_image_infrared_right;
+        cv_image_infrared_right.image = mat_infrared_right;
+        cv_image_infrared_right.encoding = "mono8";
+        sensor_msgs::Image ros_image_infrared_right;
+        cv_image_infrared_right.toImageMsg(ros_image_infrared_right);
+
+        /////////////////////////////////////////
+        // UPDATE IMSHOW VISUALIZATION WINDOWS //
+        /////////////////////////////////////////
+        
+        // Update the window with new frame
+        cv::imshow(window_name_depth, mat_depth_RGB_8bit);
+		cv::imshow(window_name_infrared_left, mat_infrared_left);
+		cv::imshow(window_name_infrared_right, mat_infrared_right);
+        
+        /////////////////////////////////////////
+        // PRINT DEPTH FRAME SIZE TO TERIMINAL //
+        /////////////////////////////////////////
+
+        cout << "Depth Frame Size: [" << w_depth << ", " << h_depth << "]\n";
+
+		char c = cv::waitKey(1);
+		if (c == 's')
+		{
+
+		}
+		else if (c == 'q')
+		{
+            break;
         }
 
-        // cv::Mat --> sensor_msgs::Image
-        cv_bridge::CvImage cv_image;
-        cv_image.image = depth_image_8bit_RGB;
-        cv_image.encoding = "bgr8";
-        sensor_msgs::Image ros_image;
-        cv_image.toImageMsg(ros_image);
+        ////////////////////////////////////////
+        // PUBLISH ROS MESSAGES TO ROS TOPICS //
+        ////////////////////////////////////////
 
-        /////////////////////////
-        // GET INFRARED IMAGES //
-        /////////////////////////
-
-
-
-        ///////////////////
-        // ROS PUBLISHER //
-        ///////////////////
-
-        pub.publish(ros_image);
-
-        ///////////////////////////
-        // ROS LOOP RATE CONTROL //
-        ///////////////////////////
-        loop_rate.sleep();
-        
+        pub_image_depth.publish(ros_image_depth);
+        pub_image_infrared_left.publish(ros_image_infrared_left);
+        pub_image_infrared_right.publish(ros_image_infrared_right);
     }
-
-    cnt++;
-        
-        // Update the window with new data
-        //imshow(window_name, depth_image_8bit_RGB);
-    
-    /*
-    int main(int argc, char **argv) 
-    {
-        const int num_points = 5;
-        const int vec_length = 3;
-        cv::Mat A(num_points, vec_length, CV_32FC1);
-        cv::RNG rng(0); // Fill A with random values
-        rng.fill(A, cv::RNG::UNIFORM, 0, 1);
-        cv::Mat B = cv::Mat(0,vec_length, CV_32FC1);
-        B.push_back(A.row(0));
-        B.push_back(A.row(2));
-        B.push_back(A.row(4));
-        std::cout << "A: " << A << std::endl;
-        std::cout << "B: " << B << std::endl;
-        return 0;
-    }    
-    */
-    
+      
     return EXIT_SUCCESS;
 }
 
