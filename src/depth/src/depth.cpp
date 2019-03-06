@@ -9,13 +9,14 @@
 
 #include <iostream>
 
+#include <cv_bridge/cv_bridge.h> // Bridge between OpenCV and ROS
+
 // https://stackoverflow.com/questions/19331575/cout-and-endl-errors
 using std::cout;
 using std::endl;
 
 int main(int argc, char * argv[]) try
 {
-    ros::init(argc, argv, "octomap_point_cloud_centers_fusion_node");
 
     // Declare counter
     unsigned int cnt;
@@ -64,7 +65,7 @@ int main(int argc, char * argv[]) try
         // Obtain scaled 16-bit matrix for calculations
 	    // https://stackoverflow.com/questions/6909464/convert-16-bit-depth-cvmat-to-8-bit-depth
         cv::Mat depth_image_16bit(Size(w, h), CV_16U, (void*)(depth.get_data()), Mat::AUTO_STEP);
-	    
+
         // https://stackoverflow.com/questions/17892840/opencv-multiply-scalar-and-matrix
 	    // depth_image_16bit *= scale;
 
@@ -90,12 +91,35 @@ int main(int argc, char * argv[]) try
 
 		    cnt = 0;
 	    }
-	
-    	cnt++;
 
+        // Publish sensor_msgs::Image from cv::Mat
+        // https://answers.ros.org/question/99831/publish-file-to-image-topic/
+        ros::init(argc, argv, "depth_node");
+        ros::NodeHandle nh;
+
+        ros::Publisher pub = nh.advertise<sensor_msgs::Image>("/static_image", 1);
+        ros::Rate loop_rate(5);
+
+        while (nh.ok()) 
+        {
+
+        // Create OpenCV matrix for imshow (RGB visualization)
+        cv::Mat depth_image_8bit_RGB(Size(w, h), CV_8UC3, (void*)depth_RGB.get_data(), Mat::AUTO_STEP);
+            cv_bridge::CvImage cv_image;
+            cv_image.image = depth_image_8bit_RGB;
+            cv_image.encoding = "bgr8";
+            sensor_msgs::Image ros_image;
+            cv_image.toImageMsg(ros_image);
+        
+            pub.publish(ros_image);
+            loop_rate.sleep();
+        }
+
+    	cnt++;
+        
         // Update the window with new data
-        imshow(window_name, depth_image_8bit_RGB);
-    
+        //imshow(window_name, depth_image_8bit_RGB);
+
     }
     
     /*

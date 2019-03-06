@@ -5,10 +5,16 @@ set(CMAKE_BUILD_TYPE Release)
 
 message("CMAKE_C_FLAGS_RELEASE is ${CMAKE_C_FLAGS_RELEASE}")
 
+find_package(
+  OpenCV 3.4.1 EXACT REQUIRED
+)
+
+# locate OpenCV in system
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
+  cv_bridge
 )
 
 ###################################
@@ -39,10 +45,6 @@ catkin_package(
 ## ROSIFIED CMAKELISTS.TXT CODE
 
 set(CMAKE_CXX_STANDARD 11)
-# locate OpenCV in system
-find_package(
-  OpenCV 3.4.1 EXACT REQUIRED
-)
 
 # provide library headers
 include_directories(include)
