@@ -17,7 +17,8 @@ using std::endl;
 
 int main(int argc, char * argv[]) try
 {
-
+    //cout << "FPS = " << framerate << endl;
+    
     // Declare counter
     unsigned int cnt;
     
@@ -36,7 +37,7 @@ int main(int argc, char * argv[]) try
     // Find depth sensor 
     // https://github.com/IntelRealSense/librealsense/wiki/API-How-To
     rs2::depth_sensor ds = dev.first<rs2::depth_sensor>();//front().as<depth_sensor>();
-
+    
     // Find depth sensor scaling factor
     float scale = ds.get_depth_scale();
 
@@ -44,28 +45,24 @@ int main(int argc, char * argv[]) try
     const auto window_name = "Display Image";
     namedWindow(window_name, WINDOW_AUTOSIZE);
 
-    while (waitKey(1) < 0 && cvGetWindowHandle(window_name))
-    {
+    // Publish sensor_msgs::Image from cv::Mat
+    // https://answers.ros.org/question/99831/publish-file-to-image-topic/
+    ros::init(argc, argv, "depth_node");
+    ros::NodeHandle nh;
 
-        // Publish sensor_msgs::Image from cv::Mat
-        // https://answers.ros.org/question/99831/publish-file-to-image-topic/
-        ros::init(argc, argv, "depth_node");
-        ros::NodeHandle nh;
+    ros::Publisher pub = nh.advertise<sensor_msgs::Image>("/static_image", 1);
+    ros::Rate loop_rate(60); // currently RealSense defaults to 30 FPS
 
-        ros::Publisher pub = nh.advertise<sensor_msgs::Image>("/static_image", 1);
-        ros::Rate loop_rate(5);
-
-        while (nh.ok()) 
-        {
-
+    while (nh.ok() && waitKey(1) < 0 && cvGetWindowHandle(window_name)) 
+    {                
         // Wait for next set of frames from the camera
         rs2::frameset data = pipe.wait_for_frames();
 
-	    // Get depth image data
-	    rs2::frame depth = data.get_depth_frame();
+        // Get depth image data
+        rs2::frame depth = data.get_depth_frame();
 
-	    // Convert to depth image data to RGB colormap
-	    rs2::frame depth_RGB = depth.apply_filter(color_map);
+        // Convert to depth image data to RGB colormap
+        rs2::frame depth_RGB = depth.apply_filter(color_map);
         
         // Query frame size (width and height)
         const int w = depth.as<rs2::video_frame>().get_width();
@@ -75,52 +72,50 @@ int main(int argc, char * argv[]) try
         cv::Mat depth_image_8bit_RGB(Size(w, h), CV_8UC3, (void*)depth_RGB.get_data(), Mat::AUTO_STEP);
 
         // Obtain scaled 16-bit matrix for calculations
-	    // https://stackoverflow.com/questions/6909464/convert-16-bit-depth-cvmat-to-8-bit-depth
-        cv::Mat depth_image_16bit(Size(w, h), CV_16U, (void*)(depth.get_data()), Mat::AUTO_STEP);
+        // https://stackoverflow.com/questions/6909464/convert-16-bit-depth-cvmat-to-8-bit-depth
+        //cv::Mat depth_image_16bit(Size(w, h), CV_16U, (void*)(depth.get_data()), Mat::AUTO_STEP);
 
         // https://stackoverflow.com/questions/17892840/opencv-multiply-scalar-and-matrix
-	    // depth_image_16bit *= scale;
+        // depth_image_16bit *= scale;
 
-	    // Obtain depth image (meters) for calculations
-	    //https://stackoverflow.com/questions/6302171/convert-uchar-mat-to-float-mat-in-opencv
-	    cv::Mat depth_image_float_m;
-	    depth_image_16bit.convertTo(depth_image_float_m, CV_32F, scale);//0.00390625); // Note: 1/256 = 0.00390625
+        // Obtain depth image (meters) for calculations
+        //https://stackoverflow.com/questions/6302171/convert-uchar-mat-to-float-mat-in-opencv
+        //cv::Mat depth_image_float_m;
+        //depth_image_16bit.convertTo(depth_image_float_m, CV_32F, scale);//0.00390625); // Note: 1/256 = 0.00390625
 
-	    // Copy one row of depth image to a new matrix
-	    cv::Mat depth_vector_float_m(Size(w, 0), CV_32F);
-	    depth_vector_float_m.push_back(depth_image_float_m.row(h-1));
-        	
-	    // Print out data
-	    if (cnt == 100)
-    	{	
-            cout << "scale = "<< endl << " "  << scale << endl << endl;
-		    cout << "w = "<< endl << " "  << w << endl << endl;
-            cout << "h = "<< endl << " "  << h << endl << endl;
-        	
-		    // https://stackoverflow.com/questions/7970988/print-out-the-values-of-a-mat-matrix-in-opencv-c
-        	cout << "\n\n\n\n\n\n\n\n\n\n depth image [m] = "<< endl << " "  << depth_image_float_m << endl << endl;
-            cout << "\n\n\n\n\n\n\n\n\n\n depth vector [m] = "<< endl << " "  << depth_vector_float_m << endl << endl;
+        // Copy one row of depth image to a new matrix
+        //cv::Mat depth_vector_float_m(Size(w, 0), CV_32F);
+        //depth_vector_float_m.push_back(depth_image_float_m.row(h-1));
+            
+        // Print out data
+        if (cnt == 100)
+        {	
+            //cout << "scale = "<< endl << " "  << scale << endl << endl;
+            //cout << "w = "<< endl << " "  << w << endl << endl;
+            //cout << "h = "<< endl << " "  << h << endl << endl;
+            
+            // https://stackoverflow.com/questions/7970988/print-out-the-values-of-a-mat-matrix-in-opencv-c
+            //cout << "\n\n\n\n\n\n\n\n\n\n depth image [m] = "<< endl << " "  << depth_image_float_m << endl << endl;
+            //cout << "\n\n\n\n\n\n\n\n\n\n depth vector [m] = "<< endl << " "  << depth_vector_float_m << endl << endl;
 
-		    cnt = 0;
-	    }
-        
-        
-            cv_bridge::CvImage cv_image;
-            cv_image.image = depth_image_8bit_RGB;
-            cv_image.encoding = "bgr8";
-            sensor_msgs::Image ros_image;
-            cv_image.toImageMsg(ros_image);
-        
-            pub.publish(ros_image);
-            loop_rate.sleep();
+            cnt = 0;
         }
 
-    	cnt++;
+        cv_bridge::CvImage cv_image;
+        cv_image.image = depth_image_8bit_RGB;
+        cv_image.encoding = "bgr8";
+        sensor_msgs::Image ros_image;
+        cv_image.toImageMsg(ros_image);
+    
+        pub.publish(ros_image);
+        loop_rate.sleep();
+        
+    }
+
+    cnt++;
         
         // Update the window with new data
         //imshow(window_name, depth_image_8bit_RGB);
-
-    }
     
     /*
     int main(int argc, char **argv) 
@@ -154,6 +149,3 @@ catch (const std::exception& e)
     std::cerr << e.what() << std::endl;
     return EXIT_FAILURE;
 }
-
-
-
