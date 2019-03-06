@@ -30,8 +30,23 @@ int main(int argc, char * argv[]) try
     // Declare RealSense pipeline, encapsulating the actual device and sensors
     rs2::pipeline pipe;
 
+    // Create a configuration for configuring the pipeline with a non default profile
+    rs2::config cfg;
+
+    // Configured depth stream
+    cfg.enable_stream(RS2_STREAM_DEPTH, 640, 480, RS2_FORMAT_Z16, 60);
+
+    // Configured left infrared stream
+    cfg.enable_stream(RS2_STREAM_INFRARED, 1, 640, 480, RS2_FORMAT_Y8, 60);
+    
+    // Configured right infrared stream
+    cfg.enable_stream(RS2_STREAM_INFRARED, 2, 640, 480, RS2_FORMAT_Y8, 60);
+
+    //Instruct pipeline to start streaming with the requested configuration
+    //pipe.start(cfg);
+
     // Start streaming with default recommended configuration
-    rs2::pipeline_profile profile = pipe.start();
+    rs2::pipeline_profile profile = pipe.start(cfg);
     
     // Find device
     rs2::device dev = profile.get_device();
@@ -72,9 +87,9 @@ int main(int argc, char * argv[]) try
         // Wait for next set of frames from the camera
         rs2::frameset data = pipe.wait_for_frames();
 
-        ////////////////////
-        // GET DEPTH DATA //
-        ////////////////////
+        /////////////////////
+        // GET DEPTH IMAGE //
+        /////////////////////
 
         // Get depth image data
         rs2::frame depth = data.get_depth_frame();
@@ -125,6 +140,11 @@ int main(int argc, char * argv[]) try
         cv_image.encoding = "bgr8";
         sensor_msgs::Image ros_image;
         cv_image.toImageMsg(ros_image);
+
+        /////////////////////////
+        // GET INFRARED IMAGES //
+        /////////////////////////
+
 
 
         ///////////////////
