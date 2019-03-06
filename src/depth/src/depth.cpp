@@ -17,8 +17,10 @@ using std::endl;
 
 int main(int argc, char * argv[]) try
 {
-    //cout << "FPS = " << framerate << endl;
-    
+    /////////////////////////////
+    // REALSENSE CONFIGURATION //
+    /////////////////////////////
+
     // Declare counter
     unsigned int cnt;
     
@@ -45,6 +47,10 @@ int main(int argc, char * argv[]) try
     const auto window_name = "Display Image";
     namedWindow(window_name, WINDOW_AUTOSIZE);
 
+    ///////////////////////
+    // ROS CONFIGURATION //
+    ///////////////////////
+
     // Publish sensor_msgs::Image from cv::Mat
     // https://answers.ros.org/question/99831/publish-file-to-image-topic/
     ros::init(argc, argv, "depth_node");
@@ -53,10 +59,22 @@ int main(int argc, char * argv[]) try
     ros::Publisher pub = nh.advertise<sensor_msgs::Image>("/static_image", 1);
     ros::Rate loop_rate(60); // currently RealSense defaults to 30 FPS
 
+    /////////////////////
+    // FRAME RATE LOOP //
+    /////////////////////
+
     while (nh.ok() && waitKey(1) < 0 && cvGetWindowHandle(window_name)) 
-    {                
+    {
+        //////////////////////////////
+        // WAIT FOR REALSENSE FRAME //
+        //////////////////////////////
+
         // Wait for next set of frames from the camera
         rs2::frameset data = pipe.wait_for_frames();
+
+        ////////////////////
+        // GET DEPTH DATA //
+        ////////////////////
 
         // Get depth image data
         rs2::frame depth = data.get_depth_frame();
@@ -101,13 +119,23 @@ int main(int argc, char * argv[]) try
             cnt = 0;
         }
 
+        // cv::Mat --> sensor_msgs::Image
         cv_bridge::CvImage cv_image;
         cv_image.image = depth_image_8bit_RGB;
         cv_image.encoding = "bgr8";
         sensor_msgs::Image ros_image;
         cv_image.toImageMsg(ros_image);
-    
+
+
+        ///////////////////
+        // ROS PUBLISHER //
+        ///////////////////
+
         pub.publish(ros_image);
+
+        ///////////////////////////
+        // ROS LOOP RATE CONTROL //
+        ///////////////////////////
         loop_rate.sleep();
         
     }
