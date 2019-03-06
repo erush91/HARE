@@ -53,7 +53,7 @@ int main(int argc, char * argv[]) try
 
 	    // Convert to depth image data to RGB colormap
 	    rs2::frame depth_RGB = depth.apply_filter(color_map);
-
+        
         // Query frame size (width and height)
         const int w = depth.as<rs2::video_frame>().get_width();
         const int h = depth.as<rs2::video_frame>().get_height();
@@ -72,30 +72,30 @@ int main(int argc, char * argv[]) try
 	    //https://stackoverflow.com/questions/6302171/convert-uchar-mat-to-float-mat-in-opencv
 	    cv::Mat depth_image_float_m;
 	    depth_image_16bit.convertTo(depth_image_float_m, CV_32F, scale);//0.00390625); // Note: 1/256 = 0.00390625
-	
+
 	    // Copy one row of depth image to a new matrix
 	    cv::Mat depth_vector_float_m(Size(w, 0), CV_32F);
 	    depth_vector_float_m.push_back(depth_image_float_m.row(h-1));
-	
-	
+        	
 	    // Print out data
 	    if (cnt == 100)
     	{	
             cout << "scale = "<< endl << " "  << scale << endl << endl;
 		    cout << "w = "<< endl << " "  << w << endl << endl;
-        	cout << "h = "<< endl << " "  << h << endl << endl;
+            cout << "h = "<< endl << " "  << h << endl << endl;
         	
 		    // https://stackoverflow.com/questions/7970988/print-out-the-values-of-a-mat-matrix-in-opencv-c
-        	//cout << "\n\n\n\n\n\n\n\n\n\n depth image [m] = "<< endl << " "  << depth_image_float_m << endl << endl;
-            //cout << "\n\n\n\n\n\n\n\n\n\n depth vector [m] = "<< endl << " "  << depth_vector_float_m << endl << endl;
-		
+        	cout << "\n\n\n\n\n\n\n\n\n\n depth image [m] = "<< endl << " "  << depth_image_float_m << endl << endl;
+            cout << "\n\n\n\n\n\n\n\n\n\n depth vector [m] = "<< endl << " "  << depth_vector_float_m << endl << endl;
+
 		    cnt = 0;
 	    }
 	
-	cnt++;
+    	cnt++;
+
+        // Update the window with new data
+        imshow(window_name, depth_image_8bit_RGB);
     
-    // Update the window with new data
-    imshow(window_name, depth_image_8bit_RGB);
     }
     
     /*
