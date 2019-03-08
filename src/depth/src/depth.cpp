@@ -29,7 +29,22 @@ using std::endl;
 
 int main(int argc, char * argv[]) try
 {
+    ros::init(argc, argv, "depth_node");
+    ros::NodeHandle nh_;
 
+    ////////////////////
+    // GET PARAMETERS //
+    ////////////////////
+
+    float resolution = 1.0;
+    bool FLAG_DEPTH = 0;
+    bool FLAG_INFRARED = 0;
+    bool FLAG_COLOR = 0;
+
+    nh_.param("FLAG_DEPTH", FLAG_DEPTH, FLAG_DEPTH);
+    nh_.param("FLAG_INFRARED", FLAG_INFRARED, FLAG_INFRARED);
+    nh_.param("FLAG_COLOR", FLAG_COLOR, FLAG_COLOR);
+    
     //////////////////////////
     // INITIALIZE REALSENSE //
     //////////////////////////
@@ -37,6 +52,7 @@ int main(int argc, char * argv[]) try
     // Declare counter
     unsigned int cnt = 0;
 
+    
     // Declare depth colorizer for pretty visualization of depth frame
     rs2::colorizer color_map;
 
@@ -181,25 +197,30 @@ int main(int argc, char * argv[]) try
     const auto window_name_infrared_right = "IR (Right)";
     namedWindow(window_name_infrared_right, WINDOW_AUTOSIZE);
     
-    /////////////////////////////
-    // CONFIGURE ROS PUBLISERS //
-    /////////////////////////////
+    //////////////////////////////
+    // CONFIGURE ROS PUBLISHERS //
+    //////////////////////////////
 
     // Publish sensor_msgs::Image
     // https://answers.ros.org/question/99831/publish-file-to-image-topic/
-    ros::init(argc, argv, "depth_node");
-    ros::NodeHandle nh;
 
-    ros::Publisher pub_image_depth = nh.advertise<sensor_msgs::Image>("/camera/depth/image_raw", 1);
-    ros::Publisher pub_image_infrared_left = nh.advertise<sensor_msgs::Image>("/camera/infra1/image_raw", 1);
-    ros::Publisher pub_image_infrared_right = nh.advertise<sensor_msgs::Image>("/camera/infra2/image_raw", 1);
-    
+    ros::Publisher pub_image_depth = nh_.advertise<sensor_msgs::Image>("/camera/depth/image_rect_raw", 1);
+    ros::Publisher pub_image_infrared_left = nh_.advertise<sensor_msgs::Image>("/camera/infra1/image_rect_raw", 1);
+    ros::Publisher pub_image_infrared_right = nh_.advertise<sensor_msgs::Image>("/camera/infra2/image_rect_raw", 1);
+    ///marble_nuc6/camera/color/image_raw
     //////////////////////////
     // GET REALSENSE FRAMES //
     //////////////////////////
 
-    while (nh.ok() && waitKey(1) < 0) 
+    while (nh_.ok() && waitKey(1) < 0) 
     {
+
+        //////////////////////////////////
+        // PRINT PARAMETERS TO TERMINAL //
+        //////////////////////////////////
+
+        cout << "Resolution: " << resolution << endl;
+
         ///////////////////////////////
         // PRINT FRAME # TO TERMINAL //
         ///////////////////////////////
@@ -324,9 +345,9 @@ int main(int argc, char * argv[]) try
         /////////////////////////////////////////
         
         // Update the window with new frame
-        //cv::imshow(window_name_depth, mat_depth_RGB_8bit);
-		//cv::imshow(window_name_infrared_left, mat_infrared_left);
-		//cv::imshow(window_name_infrared_right, mat_infrared_right);
+        cv::imshow(window_name_depth, mat_depth_RGB_8bit);
+		cv::imshow(window_name_infrared_left, mat_infrared_left);
+		cv::imshow(window_name_infrared_right, mat_infrared_right);
         
         /////////////////////////////////////////
         // PRINT DEPTH FRAME SIZE TO TERIMINAL //
