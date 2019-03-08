@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>realsense_depth</name>
+  <name>rs_custom_wrapper</name>
   <version>0.0.0</version>
   <description>The depth package</description>
 

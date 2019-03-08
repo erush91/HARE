@@ -23,7 +23,7 @@
 #include <librealsense2/rs.hpp>
 #include <librealsense2/rs_advanced_mode.hpp>
 
-#include "realsense_depth/realsense_depth.h"
+#include "rs_custom_wrapper/rs_custom_wrapper.h"
 
 // https://stackoverflow.com/questions/19331575/cout-and-endl-errors
 using std::cout;
@@ -45,14 +45,17 @@ int main(int argc, char * argv[]) try
     bool DEPTH_FLAG = 0;
     int DEPTH_WIDTH = 848;
     int DEPTH_HEIGHT = 480;
+    int DEPTH_FPS = 30;
 
     bool INFRARED_FLAG = 0;
     int INFRARED_WIDTH = 848;
     int INFRARED_HEIGHT = 480;
+    int INFRARED_FPS = 30;
 
     bool COLOR_FLAG = 0;
     int COLOR_WIDTH = 848;
     int COLOR_HEIGHT = 480;
+    int COLOR_FPS = 30;
 
     nh_.param("VISUALIZER_FLAG", VISUALIZER_FLAG, VISUALIZER_FLAG);
 
@@ -61,14 +64,17 @@ int main(int argc, char * argv[]) try
     nh_.param("DEPTH_FLAG", DEPTH_FLAG, DEPTH_FLAG);
     nh_.param("DEPTH_WIDTH", DEPTH_WIDTH, DEPTH_WIDTH);
     nh_.param("DEPTH_HEIGHT", DEPTH_HEIGHT, DEPTH_HEIGHT);
+    nh_.param("DEPTH_FPS", DEPTH_FPS, DEPTH_FPS);
 
     nh_.param("INFRARED_FLAG", INFRARED_FLAG, INFRARED_FLAG);
     nh_.param("INFRARED_WIDTH", INFRARED_WIDTH, INFRARED_WIDTH);
     nh_.param("INFRARED_HEIGHT", INFRARED_HEIGHT, INFRARED_HEIGHT);
+    nh_.param("INFRARED_FPS", INFRARED_FPS, INFRARED_FPS);
 
     nh_.param("COLOR_FLAG", COLOR_FLAG, COLOR_FLAG);
     nh_.param("COLOR_WIDTH", COLOR_WIDTH, COLOR_WIDTH);
     nh_.param("COLOR_HEIGTH", COLOR_HEIGHT, COLOR_HEIGHT);
+    nh_.param("COLOR_FPS", COLOR_FPS, COLOR_FPS);
 
     //////////////////////////
     // INITIALIZE REALSENSE //
@@ -99,14 +105,14 @@ int main(int argc, char * argv[]) try
     // WE WANT 848 x 480 RESOLUTION AT 30 FPS
 
     // Configured depth stream
-    cfg.enable_stream(RS2_STREAM_DEPTH, DEPTH_WIDTH, DEPTH_HEIGHT, RS2_FORMAT_Z16, 30);
+    cfg.enable_stream(RS2_STREAM_DEPTH, DEPTH_WIDTH, DEPTH_HEIGHT, RS2_FORMAT_Z16, DEPTH_FPS);
 
     // Configured left infrared stream
     // https://github.com/IntelRealSense/librealsense/issues/1140
-    cfg.enable_stream(RS2_STREAM_INFRARED, 1, INFRARED_WIDTH, INFRARED_HEIGHT, RS2_FORMAT_Y8, 30);
+    cfg.enable_stream(RS2_STREAM_INFRARED, 1, INFRARED_WIDTH, INFRARED_HEIGHT, RS2_FORMAT_Y8, INFRARED_FPS);
     
     // Configured right infrared stream
-    cfg.enable_stream(RS2_STREAM_INFRARED, 2, INFRARED_WIDTH, INFRARED_HEIGHT, RS2_FORMAT_Y8, 30);
+    cfg.enable_stream(RS2_STREAM_INFRARED, 2, INFRARED_WIDTH, INFRARED_HEIGHT, RS2_FORMAT_Y8, COLOR_FPS);
 
     // Instruct pipeline to start streaming with the requested configuration
     rs2::pipeline_profile profile = pipe.start(cfg);
@@ -285,12 +291,21 @@ int main(int argc, char * argv[]) try
             /////////////////////////////////////////
 
             cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" << endl;
-            cout << "Depth Frame Size: [" << DEPTH_WIDTH << ", " << DEPTH_HEIGHT << "]" << endl;
             cout << "VISUALIZER_FLAG: " << VISUALIZER_FLAG << endl;
+            cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" << endl;
             cout << "LASER_FLAG: " << LASER_FLAG << endl;
+            cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" << endl;
             cout << "DEPTH_FLAG: " << DEPTH_FLAG << endl;
+            cout << "DEPTH FRAME SIZE: [" << DEPTH_WIDTH << ", " << DEPTH_HEIGHT << "]" << endl;
+            cout << "DEPTH_FPS: " << DEPTH_FPS << endl;
+            cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" << endl;
             cout << "INFRARED_FLAG: " << INFRARED_FLAG << endl;
+            cout << "INFRARED FRAME SIZE: [" << INFRARED_WIDTH << ", " << INFRARED_HEIGHT << "]" << endl;
+            cout << "INFRARED_FPS: " << INFRARED_FPS << endl;
+            cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" << endl;
             cout << "COLOR_FLAG: " << COLOR_FLAG << endl;
+            cout << "COLOR FRAME SIZE: [" << COLOR_WIDTH << ", " << COLOR_HEIGHT << "]" << endl;
+            cout << "COLOR_FPS: " << COLOR_FPS << endl;
             cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" << endl;
 
             /////////////////////////

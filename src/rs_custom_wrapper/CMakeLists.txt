@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(realsense_depth)
+project(rs_custom_wrapper)
 
 set(CMAKE_BUILD_TYPE Release)
 
@@ -51,20 +51,20 @@ include_directories(include)
 include_directories(
   ${catkin_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}
-  realsense_depth.h
+  rs_custom_wrapper.h
   ) 
 
-add_executable(realsense_depth
-  src/realsense_depth.cpp
+add_executable(rs_custom_wrapper
+  src/rs_custom_wrapper.cpp
 )
 
-target_link_libraries(realsense_depth
+target_link_libraries(rs_custom_wrapper
   ${catkin_LIBRARIES}
   ${OpenCV_LIBRARIES}
   /usr/local/lib/librealsense2.so 
 )
 
-add_dependencies(realsense_depth
+add_dependencies(rs_custom_wrapper
   ${${PROJECT_NAME}_EXPORTED_TARGETS} 
   ${catkin_EXPORTED_TARGETS}
 )

@@ -1,19 +1,22 @@
 <launch>
-        <node pkg="realsense_depth" type="realsense_depth" name="depth_node" output="screen">
-                <param name="VISUALIZER_FLAG" type="boolean" value="true"/>
+        <node pkg="rs_custom_wrapper" type="rs_custom_wrapper" name="depth_node" output="screen">
+                <param name="VISUALIZER_FLAG" type="boolean" value="1"/>
 
 		<param name="LASER_FLAG" type="boolean" value="1"/>
 
 		<param name="DEPTH_FLAG" type="boolean" value="1"/>
                 <param name="DEPTH_WIDTH" type="int" value="848"/>
                 <param name="DEPTH_HEIGHT" type="int" value="480"/>
+                <param name="DEPTH_FPS" type="int" value="30"/>
 
                 <param name="INFRARED_FLAG" type="boolean" value="1"/>
                 <param name="INFRARED_WIDTH" type="int" value="848"/>
                 <param name="INFRARED_HEIGHT" type="int" value="480"/>
+                <param name="INFRARED_FPS" type="int" value="30"/>
 
                 <param name="COLOR_FLAG" type="boolean" value="1"/>
                 <param name="COLOR_WIDTH" type="int" value="848"/>
                 <param name="COLOR_HEIGHT" type="int" value="480"/>
+                <param name="COLOR_FPS" type="int" value="30"/>
         </node>
 </launch>
