@@ -14,6 +14,9 @@ scan_beams: 100
 #~ scan_field_of_view: 4.71 # radians # 360deg
 scan_field_of_view: 1.588 # radians # RealSense
 
+# Z-rotation of the sensor to optimize wall-following
+scan_mount_angle_offset: -0.785 # radians # 45deg to the right
+
 # The distance from the center of the
 # rear axis (base_link) to the lidar
 scan_distance_to_base_link: 0.275 # meters

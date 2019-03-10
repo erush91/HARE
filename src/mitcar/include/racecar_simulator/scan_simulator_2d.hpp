@@ -11,8 +11,9 @@ class ScanSimulator2D {
   private:
 
     // Laser settings
-    int num_beams;
+    int    num_beams;
     double field_of_view;
+    double offset_angle;
     double angle_increment;
 
     // Ray tracing settings
@@ -38,6 +39,7 @@ class ScanSimulator2D {
     ScanSimulator2D(
         int num_beams_, 
         double field_of_view_, 
+        double offset_angle_, 
         double scan_std_dev, 
         double ray_tracing_epsilon=0.0001);
 

@@ -12,10 +12,12 @@ using namespace racecar_simulator;
 ScanSimulator2D::ScanSimulator2D(
     int    num_beams_           , 
     double field_of_view_       , 
+    double offset_angle_        ,
     double scan_std_dev         , 
     double ray_tracing_epsilon_
 ) : num_beams( num_beams_ ) ,
     field_of_view( field_of_view_ ) ,
+    offset_angle( offset_angle_ ) ,
     ray_tracing_epsilon( ray_tracing_epsilon_ ){
         
   // Initialize laser settings
@@ -33,10 +35,14 @@ const std::vector<double> ScanSimulator2D::scan( const Pose2D& pose ){
     
   // Construct a pose for each beam
   Pose2D beam_pose = pose;
-  beam_pose.theta -= field_of_view/2.;
+  //~ beam_pose.theta -= ( field_of_view/2.0 + offset_angle );
+  beam_pose.theta -= ( field_of_view/2.0 );
+  
+  beam_pose.theta += offset_angle;
 
   // Sweep through each beam
   for (int i = 0; i < num_beams; i++) {
+      
     // Compute the distance to the nearest point
     double distance = trace_ray(beam_pose);
 
@@ -55,14 +61,20 @@ const std::vector<double> ScanSimulator2D::scan( const Pose2D& pose ){
 
 double ScanSimulator2D::distance_transform(const Pose2D & pose) const {
   // Convert the pose to a grid cell
+  
+  Pose2D beam_pose{ pose };
+  
+  //~ beam_pose.theta -= offset_angle;
 
   // Translate the state by the origin
-  double x_trans = pose.x - origin.x;
-  double y_trans = pose.y - origin.y;
+  double x_trans = beam_pose.x - origin.x;
+  double y_trans = beam_pose.y - origin.y;
 
   // Rotate the state into the map
-  double x_rot = x_trans * cos(-origin.theta) - y_trans * sin(-origin.theta);
-  double y_rot = x_trans * sin(-origin.theta) + y_trans * cos(-origin.theta);
+  //~ double x_rot = x_trans * cos(-origin.theta + offset_angle ) - y_trans * sin(-origin.theta + offset_angle);
+  //~ double y_rot = x_trans * sin(-origin.theta + offset_angle ) + y_trans * cos(-origin.theta + offset_angle);
+  double x_rot = x_trans * cos( -origin.theta ) - y_trans * sin( -origin.theta );
+  double y_rot = x_trans * sin( -origin.theta ) + y_trans * cos( -origin.theta );
 
   // Clip the state to be a cell
   if (x_rot < 0 or x_rot >= width * resolution) return 0;
@@ -78,17 +90,17 @@ double ScanSimulator2D::distance_transform(const Pose2D & pose) const {
   return dt[cell];
 }
 
-double ScanSimulator2D::trace_ray(const Pose2D & pose) const {
+double ScanSimulator2D::trace_ray( const Pose2D& pose ) const {
   // Perform ray marching
   Pose2D p = pose;
   double distance_to_nearest = distance_transform(p);
   double total_distance = distance_to_nearest;
 
-  while (distance_to_nearest > ray_tracing_epsilon) {
+  while( distance_to_nearest > ray_tracing_epsilon ){
     // Move in the direction of the ray
     // by distanceToObstacle
-    p.x += distance_to_nearest * std::cos(p.theta);
-    p.y += distance_to_nearest * std::sin(p.theta);
+    p.x += distance_to_nearest * std::cos( p.theta );
+    p.y += distance_to_nearest * std::sin( p.theta );
     
     // Compute the nearest distance at that point
     distance_to_nearest = distance_transform(p);

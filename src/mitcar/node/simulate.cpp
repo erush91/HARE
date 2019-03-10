@@ -32,6 +32,7 @@ private:
     double previous_seconds;
     double scan_distance_to_base_link;
     double max_speed, max_steering_angle;
+    double scanner_offset_ang;
 
     // A simulator of the laser
     ScanSimulator2D scan_simulator;
@@ -107,11 +108,12 @@ public:
 
         // Fetch the car parameters
         int scan_beams;
-        double update_pose_rate , scan_field_of_view , scan_std_dev;
+        double update_pose_rate , scan_field_of_view , scan_mount_angle_offset , scan_std_dev;
         n.getParam( "wheelbase" /* ---------- */ , wheelbase );
         n.getParam( "update_pose_rate" /* --- */ , update_pose_rate );
         n.getParam( "scan_beams" /* --------- */ , scan_beams );
         n.getParam( "scan_field_of_view" /* - */ , scan_field_of_view );
+        n.getParam( "scan_mount_angle_offset"    , scan_mount_angle_offset );  scanner_offset_ang = scan_mount_angle_offset;
         n.getParam( "scan_std_dev" /* ------- */ , scan_std_dev );
         n.getParam( "map_free_threshold" /* - */ , map_free_threshold );
         n.getParam( "scan_distance_to_base_link" , scan_distance_to_base_link );
@@ -129,8 +131,9 @@ public:
 
         // Initialize a simulator of the laser scanner
         scan_simulator = ScanSimulator2D(
-            scan_beams,
-            scan_field_of_view,
+            scan_beams              ,
+            scan_field_of_view      ,
+            scan_mount_angle_offset , 
             scan_std_dev
         );
 
@@ -215,8 +218,8 @@ public:
         sensor_msgs::LaserScan scan_msg;
         scan_msg.header.stamp = timestamp;
         scan_msg.header.frame_id = scan_frame;
-        scan_msg.angle_min = -scan_simulator.get_field_of_view()/2.;
-        scan_msg.angle_max =  scan_simulator.get_field_of_view()/2.;
+        scan_msg.angle_min = -scan_simulator.get_field_of_view()/2. + scanner_offset_ang;
+        scan_msg.angle_max =  scan_simulator.get_field_of_view()/2. + scanner_offset_ang;
         scan_msg.angle_increment = scan_simulator.get_angle_increment();
         scan_msg.range_max = 100;
         scan_msg.ranges = scan_;
