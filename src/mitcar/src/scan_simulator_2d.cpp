@@ -14,10 +14,14 @@ ScanSimulator2D::ScanSimulator2D(
     double field_of_view_       , 
     double offset_angle_        ,
     double scan_std_dev         , 
+    double dist_min_            ,
+    double dist_max_            ,
     double ray_tracing_epsilon_
 ) : num_beams( num_beams_ ) ,
     field_of_view( field_of_view_ ) ,
     offset_angle( offset_angle_ ) ,
+    dist_min( dist_min_ ) ,
+    dist_max( dist_max_ ) ,
     ray_tracing_epsilon( ray_tracing_epsilon_ ){
         
   // Initialize laser settings
@@ -29,6 +33,13 @@ ScanSimulator2D::ScanSimulator2D(
   // Initialize the noise
   noise_generator = std::mt19937( std::random_device{}() );
   noise_dist = std::normal_distribution<double>( 0.0 , scan_std_dev );
+}
+
+double saturate_to_zero( double input , double loBound , double hiBound ){
+    // Return 0 if the 'input' is out of bounds, Otherwise return the 'input'
+    if( input < loBound )  return 0.0;
+    if( input > hiBound )  return 0.0;
+    return input;
 }
 
 const std::vector<double> ScanSimulator2D::scan( const Pose2D& pose ){
@@ -50,7 +61,7 @@ const std::vector<double> ScanSimulator2D::scan( const Pose2D& pose ){
     distance += noise_dist(noise_generator);
 
     // Add the distance to the output
-    scan_output[i] = distance;
+    scan_output[i] = saturate_to_zero( distance , dist_min , dist_max );
 
     // Increment the scan
     beam_pose.theta += angle_increment;

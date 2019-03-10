@@ -13,6 +13,8 @@ update_pose_rate: 0.02
 scan_beams: 100
 #~ scan_field_of_view: 4.71 # radians # 360deg
 scan_field_of_view: 1.588 # radians # RealSense
+scan_min_depth:  0.2 # > value --> Set to 0.0 , [m] 
+scan_max_depth: 10.0 # < value --> Set to 0.0 , [m] 
 
 # Z-rotation of the sensor to optimize wall-following
 scan_mount_angle_offset: -0.785 # radians # 45deg to the right

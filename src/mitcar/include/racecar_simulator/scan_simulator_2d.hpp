@@ -14,6 +14,8 @@ class ScanSimulator2D {
     int    num_beams;
     double field_of_view;
     double offset_angle;
+    double dist_min; 
+    double dist_max;
     double angle_increment;
 
     // Ray tracing settings
@@ -41,6 +43,8 @@ class ScanSimulator2D {
         double field_of_view_, 
         double offset_angle_, 
         double scan_std_dev, 
+        double dist_min =  0.2 , 
+        double dist_max = 10.0 , 
         double ray_tracing_epsilon=0.0001);
 
     void set_map(

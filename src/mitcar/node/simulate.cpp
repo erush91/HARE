@@ -108,12 +108,15 @@ public:
 
         // Fetch the car parameters
         int scan_beams;
-        double update_pose_rate , scan_field_of_view , scan_mount_angle_offset , scan_std_dev;
+        double update_pose_rate , scan_field_of_view , scan_mount_angle_offset , scan_std_dev , scan_min_depth , scan_max_depth;
         n.getParam( "wheelbase" /* ---------- */ , wheelbase );
         n.getParam( "update_pose_rate" /* --- */ , update_pose_rate );
         n.getParam( "scan_beams" /* --------- */ , scan_beams );
         n.getParam( "scan_field_of_view" /* - */ , scan_field_of_view );
+        n.getParam( "scan_field_of_view" /* - */ , scan_field_of_view );
         n.getParam( "scan_mount_angle_offset"    , scan_mount_angle_offset );  scanner_offset_ang = scan_mount_angle_offset;
+        n.getParam( "scan_min_depth" /* ----- */ , scan_min_depth );
+        n.getParam( "scan_max_depth" /* ----- */ , scan_max_depth );
         n.getParam( "scan_std_dev" /* ------- */ , scan_std_dev );
         n.getParam( "map_free_threshold" /* - */ , map_free_threshold );
         n.getParam( "scan_distance_to_base_link" , scan_distance_to_base_link );
