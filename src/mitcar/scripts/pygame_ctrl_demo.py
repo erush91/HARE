@@ -352,6 +352,7 @@ while exit == False:
     if steering_angle > max_steering_angle: steering_angle = max_steering_angle
     elif steering_angle < -max_steering_angle: steering_angle = -max_steering_angle
 
+    # === CONTROLLER ===
 
     RS_dists = get_cam_depth()
 
@@ -382,6 +383,8 @@ while exit == False:
 
     print('translation error: ',translation_err, 'steer: ',steering_angle)
     robot.move(steering_angle, speed)
+    
+    # ___ CTRL END ___
 
     # print(max(RS_dists))
     # print(speed)

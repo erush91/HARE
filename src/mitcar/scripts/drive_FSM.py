@@ -17,8 +17,11 @@ Dependencies: numpy , rospy
 
 """  
 ~~~ Developmnent Plan ~~~
-[ ] ITEM1
-[ ] ITEM2
+[ ] Drive forward && Turn
+[ ] Re-implement the Pygame demo
+[ ] Test if the pygame controller will do corners on its own
+[ ] If not, implement a dead simple turn
+[ ] Panic Mode?
 """
 
 # === Init Environment =====================================================================================================================
@@ -35,6 +38,8 @@ from math import pi , sqrt , sin , cos
 # ~~ Special ~~
 import numpy as np
 import rospy 
+from sensor_msgs.msg import Joy # NOT USED?
+from ackermann_msgs.msg import AckermannDriveStamped
 # ~~ Local ~~
 
 # ~~ Constants , Shortcuts , Aliases ~~
@@ -55,7 +60,17 @@ def __prog_signature__(): return __progname__ + " , Version " + __version__ # Re
 
 # == Program Functions ==
 
-
+def compose_ack_ctrl_msg( steerAngle , linearSpeed , orgnStr = "FSM" ):
+    """ Return an Ackerman control effort with a target steering angle and linear speed """
+    # Create msg
+    ack_msg = AckermannDriveStamped()
+    # Compose msg
+    ack_msg.header.stamp = rospy.Time.now()
+    ack_msg.header.frame_id = orgnStr
+    ack_msg.drive.steering_angle = steerAngle
+    ack_msg.drive.speed = linearSpeed
+    # Return msg
+    return ack_msg
 
 # __ End Func __
 
@@ -70,10 +85,27 @@ class CarFSM:
         # 1. Start the node
         rospy.init_node( 'CarFSM' ) 
         # 2. Set rate
-        self.heartBeatHz = 300 # ------------------- Node refresh rate [Hz]
+        try: 
+            # Attempt to set a refresh rate commensurate with the lidar update rate
+            self.heartBeatHz = int( 1.0 / rospy.get_param( "/racecar_simulator/update_pose_rate" ) )
+        except:
+            self.heartBeatHz = 300 # ------------------- Node refresh rate [Hz]
+            rospy.logwarn( "CarFSM: Unable to retrieve update rate! , Setting to " + str( self.heartBeatHz ) + "Hz ..." )
+            
         self.idle = rospy.Rate( self.heartBeatHz ) # Best effort to maintain 'heartBeatHz' , URL: http://wiki.ros.org/rospy/Overview/Time        
+        
         # 3. Start subscribers and listeners
+        # rospy.Subscriber( "TOPIC_NAME" , MSG_TYPE , CALLBACK_FUNC )
+        
         # 4. Start publishers
+        try:
+            self.driveTopic = str( rospy.get_param( "/racecar_simulator/drive_topic" ) )
+        except:
+            self.driveTopic = "/drive"
+            rospy.logwarn( "CarFSM: Unable to retrieve control topic! , Setting to " + self.driveTopic )
+            
+        self.drive_pub = rospy.Publisher( self.driveTopic , AckermannDriveStamped , queue_size = 10 )
+        
         # 5. Init vars
         self.initTime = rospy.Time.now().to_sec()        
         
@@ -83,7 +115,8 @@ class CarFSM:
         # 1. While ROS is running
         while ( not rospy.is_shutdown() ):
             
-            # 1. FIXME: THINGS TO DO WHILE THE NODE IS RUNNING
+            # 1. Drive Test
+            self.drive_pub.publish(  compose_ack_ctrl_msg( pi/8 , 2.0 )  )
             
             # N-1: Wait until the node is supposed to fire next
             self.idle.sleep()        
@@ -107,7 +140,7 @@ if __name__ == "__main__":
     print __prog_signature__()
     termArgs = sys.argv[1:] # Terminal arguments , if they exist
     
-    FOO = CLASSNAME( 300 )
+    FOO = CarFSM()
     FOO.run()    
     
 
