@@ -29,7 +29,7 @@ map_free_threshold: 0.3
 # Enables joystick if true
 joy: true
 joy_speed_axis: 1
-joy_angle_axis: 2
+joy_angle_axis: 3
 joy_max_speed: 2. # meters/second
 
 # The names of topics to listen and publish to
