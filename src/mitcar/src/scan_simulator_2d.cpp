@@ -1,3 +1,8 @@
+/*
+ ~~ NOTES ~~
+2019-03-10: It looks like the output is, in fact, in meters
+*/
+
 #include "racecar_simulator/pose_2d.hpp"
 #include "racecar_simulator/scan_simulator_2d.hpp"
 #include "racecar_simulator/distance_transform.hpp"
@@ -5,26 +10,27 @@
 using namespace racecar_simulator;
 
 ScanSimulator2D::ScanSimulator2D(
-    int num_beams_, 
-    double field_of_view_, 
-    double scan_std_dev, 
-    double ray_tracing_epsilon_) 
-  : num_beams(num_beams_),
-    field_of_view(field_of_view_),
-    ray_tracing_epsilon(ray_tracing_epsilon_)
-{
+    int    num_beams_           , 
+    double field_of_view_       , 
+    double scan_std_dev         , 
+    double ray_tracing_epsilon_
+) : num_beams( num_beams_ ) ,
+    field_of_view( field_of_view_ ) ,
+    ray_tracing_epsilon( ray_tracing_epsilon_ ){
+        
   // Initialize laser settings
-  angle_increment = field_of_view/(num_beams - 1);
+  angle_increment = field_of_view / ( num_beams - 1 );
 
   // Initialize the output
-  scan_output = std::vector<double>(num_beams);
+  scan_output = std::vector<double>( num_beams );
 
   // Initialize the noise
-  noise_generator = std::mt19937(std::random_device{}());
-  noise_dist = std::normal_distribution<double>(0., scan_std_dev);
+  noise_generator = std::mt19937( std::random_device{}() );
+  noise_dist = std::normal_distribution<double>( 0.0 , scan_std_dev );
 }
 
-const std::vector<double> ScanSimulator2D::scan(const Pose2D & pose) {
+const std::vector<double> ScanSimulator2D::scan( const Pose2D& pose ){
+    
   // Construct a pose for each beam
   Pose2D beam_pose = pose;
   beam_pose.theta -= field_of_view/2.;
