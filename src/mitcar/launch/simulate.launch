@@ -1,6 +1,9 @@
 <launch>
   <!-- Listen to messages from joysicks -->
   <node pkg="joy" name="joy_node" type="joy_node"/>
+  
+  <!-- Joystick command interpreter -->
+  <node pkg="racecar_simulator" name="joy_ctrl" type="joy_ctrl"/>
 
   <!-- Launch a map from the maps folder-->
   <arg name="map" default="$(find racecar_simulator)/maps/hall_w_doors.yaml"/>

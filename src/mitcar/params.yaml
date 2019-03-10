@@ -30,7 +30,7 @@ map_free_threshold: 0.3
 joy: true
 joy_speed_axis: 1
 joy_angle_axis: 3
-joy_max_speed: 2. # meters/second
+joy_max_speed: 4.0 # meters/second
 
 # The names of topics to listen and publish to
 joy_topic: "/joy"

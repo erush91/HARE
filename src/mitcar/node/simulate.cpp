@@ -13,10 +13,14 @@
 #include "racecar_simulator/ackermann_kinematics.hpp"
 #include "racecar_simulator/scan_simulator_2d.hpp"
 
+// Uncomment to force joystick connection
+//~ #define INCLUDEJOY
+
 using namespace racecar_simulator;
 
-class RacecarSimulator {
-  private:
+class RacecarSimulator{
+
+private:
     // The transformation frames used
     std::string map_frame, base_frame, scan_frame;
 
@@ -33,9 +37,11 @@ class RacecarSimulator {
     ScanSimulator2D scan_simulator;
     double map_free_threshold;
 
-    // Joystick parameters
-    int joy_speed_axis, joy_angle_axis;
-    double joy_max_speed;
+    #ifdef INCLUDEJOY
+        // Joystick parameters
+        int joy_speed_axis, joy_angle_axis;
+        double joy_max_speed;
+    #endif
 
     // A ROS node
     ros::NodeHandle n;
@@ -48,7 +54,10 @@ class RacecarSimulator {
 
     // Listen for drive and joystick commands
     ros::Subscriber drive_sub;
-    ros::Subscriber joy_sub;
+    
+    #ifdef INCLUDEJOY
+        ros::Subscriber joy_sub;
+    #endif
 
     // Listen for a map
     ros::Subscriber map_sub;
@@ -61,79 +70,92 @@ class RacecarSimulator {
     // Publish a scan
     ros::Publisher scan_pub;
 
-  public:
+public:
 
-    RacecarSimulator() {
-      // Initialize the node handle
-      n = ros::NodeHandle("~");
+    RacecarSimulator(){
+        // Initialize the node handle
+        n = ros::NodeHandle("~");
 
-      // Initialize the pose and driving commands
-      pose = {.x=0, .y=0, .theta=0};
-      speed = 0;
-      steering_angle = 0;
-      previous_seconds = ros::Time::now().toSec();
+        // Initialize the pose and driving commands
+        pose = { .x = 0 , .y = 0 , .theta = 0 };
+        speed = 0;
+        steering_angle = 0;
+        previous_seconds = ros::Time::now().toSec();
 
-      // Get the topic names
-      std::string joy_topic, drive_topic, map_topic, 
-        scan_topic, pose_topic, pose_rviz_topic;
-      n.getParam("joy_topic", joy_topic);
-      n.getParam("drive_topic", drive_topic);
-      n.getParam("map_topic", map_topic);
-      n.getParam("scan_topic", scan_topic);
-      n.getParam("pose_topic", pose_topic);
-      n.getParam("pose_rviz_topic", pose_rviz_topic);
+        // Get the topic names
+        std::string 
+            #ifdef INCLUDEJOY
+                joy_topic , 
+            #endif
+            drive_topic , map_topic       , 
+            scan_topic  , pose_topic  , pose_rviz_topic ;
+            
+        #ifdef INCLUDEJOY
+           n.getParam( "joy_topic"       , joy_topic       );
+        #endif
+        
+        n.getParam( "drive_topic"     , drive_topic     );
+        n.getParam( "map_topic"       , map_topic       );
+        n.getParam( "scan_topic"      , scan_topic      );
+        n.getParam( "pose_topic"      , pose_topic      );
+        n.getParam( "pose_rviz_topic" , pose_rviz_topic );
 
-      // Get the transformation frame names
-      n.getParam("map_frame", map_frame);
-      n.getParam("base_frame", base_frame);
-      n.getParam("scan_frame", scan_frame);
+        // Get the transformation frame names
+        n.getParam( "map_frame"  , map_frame  );
+        n.getParam( "base_frame" , base_frame );
+        n.getParam( "scan_frame" , scan_frame );
 
-      // Fetch the car parameters
-      int scan_beams;
-      double update_pose_rate, scan_field_of_view, scan_std_dev;
-      n.getParam("wheelbase", wheelbase);
-      n.getParam("update_pose_rate", update_pose_rate);
-      n.getParam("scan_beams", scan_beams);
-      n.getParam("scan_field_of_view", scan_field_of_view);
-      n.getParam("scan_std_dev", scan_std_dev);
-      n.getParam("map_free_threshold", map_free_threshold);
-      n.getParam("scan_distance_to_base_link", scan_distance_to_base_link);
-      n.getParam("max_speed", max_speed);
-      n.getParam("max_steering_angle", max_steering_angle);
+        // Fetch the car parameters
+        int scan_beams;
+        double update_pose_rate , scan_field_of_view , scan_std_dev;
+        n.getParam( "wheelbase" /* ---------- */ , wheelbase );
+        n.getParam( "update_pose_rate" /* --- */ , update_pose_rate );
+        n.getParam( "scan_beams" /* --------- */ , scan_beams );
+        n.getParam( "scan_field_of_view" /* - */ , scan_field_of_view );
+        n.getParam( "scan_std_dev" /* ------- */ , scan_std_dev );
+        n.getParam( "map_free_threshold" /* - */ , map_free_threshold );
+        n.getParam( "scan_distance_to_base_link" , scan_distance_to_base_link );
+        n.getParam( "max_speed" /* ---------- */ , max_speed );
+        n.getParam( "max_steering_angle" /* - */ , max_steering_angle );
 
-      // Get joystick parameters
-      bool joy;
-      n.getParam("joy", joy);
-      n.getParam("joy_speed_axis", joy_speed_axis);
-      n.getParam("joy_angle_axis", joy_angle_axis);
-      n.getParam("joy_max_speed", joy_max_speed);
+        #ifdef INCLUDEJOY
+            // Get joystick parameters
+            bool joy;
+            n.getParam("joy", joy);
+            n.getParam("joy_speed_axis", joy_speed_axis);
+            n.getParam("joy_angle_axis", joy_angle_axis);
+            n.getParam("joy_max_speed", joy_max_speed);
+        #endif
 
-      // Initialize a simulator of the laser scanner
-      scan_simulator = ScanSimulator2D(
-          scan_beams,
-          scan_field_of_view,
-          scan_std_dev);
+        // Initialize a simulator of the laser scanner
+        scan_simulator = ScanSimulator2D(
+            scan_beams,
+            scan_field_of_view,
+            scan_std_dev
+        );
 
-      // Make a publisher for laser scan messages
-      scan_pub = n.advertise<sensor_msgs::LaserScan>(scan_topic, 1);
+        // Make a publisher for laser scan messages
+        scan_pub = n.advertise<sensor_msgs::LaserScan>( scan_topic , 1 );
 
-      // Start a timer to output the pose
-      update_pose_timer = n.createTimer(ros::Duration(update_pose_rate), &RacecarSimulator::update_pose, this);
+        // Start a timer to output the pose
+        update_pose_timer = n.createTimer(ros::Duration(update_pose_rate), &RacecarSimulator::update_pose, this);
 
-      // If the joystick is enabled
-      if (joy)
-        // Start a subscriber to listen to joystick commands
-        joy_sub = n.subscribe(joy_topic, 1, &RacecarSimulator::joy_callback, this);
+        #ifdef INCLUDEJOY
+            // If the joystick is enabled
+            if (joy)
+                // Start a subscriber to listen to joystick commands
+                joy_sub = n.subscribe(joy_topic, 1, &RacecarSimulator::joy_callback, this);
+        #endif
 
-      // Start a subscriber to listen to drive commands
-      drive_sub = n.subscribe(drive_topic, 1, &RacecarSimulator::drive_callback, this);
+        // Start a subscriber to listen to drive commands
+        drive_sub = n.subscribe(drive_topic, 1, &RacecarSimulator::drive_callback, this);
 
-      // Start a subscriber to listen to new maps
-      map_sub = n.subscribe(map_topic, 1, &RacecarSimulator::map_callback, this);
+        // Start a subscriber to listen to new maps
+        map_sub = n.subscribe(map_topic, 1, &RacecarSimulator::map_callback, this);
 
-      // Start a subscriber to listen to pose messages
-      pose_sub = n.subscribe(pose_topic, 1, &RacecarSimulator::pose_callback, this);
-      pose_rviz_sub = n.subscribe(pose_rviz_topic, 1, &RacecarSimulator::pose_rviz_callback, this);
+        // Start a subscriber to listen to pose messages
+        pose_sub = n.subscribe(pose_topic, 1, &RacecarSimulator::pose_callback, this);
+        pose_rviz_sub = n.subscribe(pose_rviz_topic, 1, &RacecarSimulator::pose_rviz_callback, this);
     }
 
     void update_pose(const ros::TimerEvent&) {
@@ -222,21 +244,23 @@ class RacecarSimulator {
     }
 
     void pose_rviz_callback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr & msg) {
-      pose_callback(msg -> pose.pose);
+        pose_callback(msg -> pose.pose);
     }
 
-    void drive_callback(const ackermann_msgs::AckermannDriveStamped & msg) {
-      set_speed(msg.drive.speed);
-      set_steering_angle(msg.drive.steering_angle, ros::Time::now());
+    void drive_callback( const ackermann_msgs::AckermannDriveStamped& msg ){
+        set_speed( msg.drive.speed );
+        set_steering_angle( msg.drive.steering_angle , ros::Time::now() );
     }
 
-    void joy_callback(const sensor_msgs::Joy & msg) {
-      set_speed(
-          joy_max_speed * msg.axes[joy_speed_axis]);
-      set_steering_angle(
-          max_steering_angle * msg.axes[joy_angle_axis],
-          ros::Time::now());
-    }
+    #ifdef INCLUDEJOY
+        void joy_callback( const sensor_msgs::Joy& msg ){
+            set_speed(  joy_max_speed * msg.axes[ joy_speed_axis ]  );
+            set_steering_angle(
+                max_steering_angle * msg.axes[ joy_angle_axis ],
+                ros::Time::now()
+            );
+        }
+    #endif
 
     void set_speed(double speed_) {
       speed = std::min(std::max(speed_, -max_speed), max_speed);
