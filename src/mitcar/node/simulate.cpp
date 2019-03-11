@@ -126,10 +126,10 @@ public:
         #ifdef INCLUDEJOY
             // Get joystick parameters
             bool joy;
-            n.getParam("joy", joy);
-            n.getParam("joy_speed_axis", joy_speed_axis);
-            n.getParam("joy_angle_axis", joy_angle_axis);
-            n.getParam("joy_max_speed", joy_max_speed);
+            n.getParam( "joy"            , joy            );
+            n.getParam( "joy_speed_axis" , joy_speed_axis );
+            n.getParam( "joy_angle_axis" , joy_angle_axis );
+            n.getParam( "joy_max_speed"  , joy_max_speed  );
         #endif
 
         // Initialize a simulator of the laser scanner

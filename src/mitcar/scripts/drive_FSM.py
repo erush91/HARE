@@ -17,7 +17,7 @@ Dependencies: numpy , rospy
 
 """  
 ~~~ Developmnent Plan ~~~
-[ ] Drive forward && Turn
+[Y] Drive forward && Turn
 [ ] Re-implement the Pygame demo
 [ ] Test if the pygame controller will do corners on its own
 [ ] If not, implement a dead simple turn
@@ -40,6 +40,7 @@ import numpy as np
 import rospy 
 from sensor_msgs.msg import Joy # NOT USED?
 from ackermann_msgs.msg import AckermannDriveStamped
+from sensor_msgs.msg import LaserScan # http://www.theconstructsim.com/read-laserscan-data/
 # ~~ Local ~~
 
 # ~~ Constants , Shortcuts , Aliases ~~
@@ -95,7 +96,10 @@ class CarFSM:
         self.idle = rospy.Rate( self.heartBeatHz ) # Best effort to maintain 'heartBeatHz' , URL: http://wiki.ros.org/rospy/Overview/Time        
         
         # 3. Start subscribers and listeners
-        # rospy.Subscriber( "TOPIC_NAME" , MSG_TYPE , CALLBACK_FUNC )
+        rospy.Subscriber( "/scan" , LaserScan , self.scan_cb )
+        self.numReadings = 100
+        self.lastScan = [ 0 for i in range( self.numReadings ) ]
+        
         
         # 4. Start publishers
         try:
@@ -107,16 +111,77 @@ class CarFSM:
         self.drive_pub = rospy.Publisher( self.driveTopic , AckermannDriveStamped , queue_size = 10 )
         
         # 5. Init vars
-        self.initTime = rospy.Time.now().to_sec()        
+        self.initTime = rospy.Time.now().to_sec()       
+        
+        # 6. Driving Vars
+        self.err_hist_window = 25 # Width of the integration window
+        self.err_hist        = [ 0 for i in range( self.err_hist_window ) ] # Integration window
+        self.wallSetPnt      =  1.75 # [m]
+        self.nearN           = 30 # Count this many points as near the average
+        self.slope_window    =  5 # Look this many points in the past to compute slope
+        # ~ PID ~
+        self.K_d = 0.0000
+        self.K_i = 0.00000
+        self.K_p = 0.4000
+        # ~ Control Output ~
+        self.steerAngle  = 0.0
+        self.linearSpeed = 4.0
+        
+    def near_avg( self ):
+        """ Average of the nearest points """
+        return np.mean( self.lastScan[ :self.nearN ] )
+        
+    def scan_cb( self , msg ):
+        """ Process the scan that comes back from the scanner """
+        # NOTE: Scan progresses from least theta to most theta: CCW
+        # print "Got a scanner message with" , len( msg.intensities ) , "readings!"
+        # ~ print "Scan:" , self.lastScan
+        # print "Scan Min:" , min( self.lastScan ) , ", Scan Max:" , max( self.lastScan )
+        self.lastScan = msg.intensities # Do I need to copy this?
+        
+    def wall_follow_state( self ):
+        """ Try to maintain a set distance from the wall """
+        # 1. Calculate and store error
+        translation_err = ( self.wallSetPnt - np.mean( self.lastScan ) )
+        # ~ translation_err = ( self.wallSetPnt - self.near_avg() )
+        self.err_hist.append( translation_err )
+        
+        if len( self.err_hist ) >= self.err_hist_window:
+            self.err_hist.pop(0)
+            u_i = self.K_i * sum( self.err_hist )
+        else:
+            u_i = 0
+
+        if self.linearSpeed > 0.1: 
+            u_d = self.K_d * ( self.err_hist[-1] - self.err_hist[ -(self.slope_window-1) ] ) 
+        else: 
+            u_d = 0
+        
+        u_p = self.K_p * translation_err
+
+        auto_steer = u_p + u_i + u_d
+        self.steerAngle = auto_steer
+
+        print 'translation error:' , translation_err , 'steer:' , self.steerAngle
+        # ~ robot.move(steering_angle, speed)
+        
         
     def run( self ):
-        """ A_ONE_LINE_DESCRIPTION_OF_RUNTIME_ACTIVITY """
+        """ Take a laser reading and generate a control signal """
         
         # 1. While ROS is running
         while ( not rospy.is_shutdown() ):
             
             # 1. Drive Test
-            self.drive_pub.publish(  compose_ack_ctrl_msg( pi/8 , 2.0 )  )
+            if 0:
+                self.drive_pub.publish(  compose_ack_ctrl_msg( pi/8 , 2.0 )  )
+                
+            # 2. Generate a control effort
+            self.wall_follow_state()
+            
+            # 3. Transmit the control effort
+            if 1:
+                self.drive_pub.publish(  compose_ack_ctrl_msg( self.steerAngle , self.linearSpeed )  )
             
             # N-1: Wait until the node is supposed to fire next
             self.idle.sleep()        
