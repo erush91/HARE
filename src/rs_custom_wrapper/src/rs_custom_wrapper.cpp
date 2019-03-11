@@ -285,6 +285,7 @@ int main(int argc, char * argv[]) try
     // Publish sensor_msgs::Image
     // https://answers.ros.org/question/99831/publish-file-to-image-topic/
 
+    ros::Publisher pub_image_depth_8b = nh_.advertise<sensor_msgs::Image>("/camera/depth_8b/image_rect_raw", 1);
     ros::Publisher pub_image_depth_RGB = nh_.advertise<sensor_msgs::Image>("/camera/depth_RGB/image_rect_raw", 1);
     ros::Publisher pub_image_depth_meters = nh_.advertise<sensor_msgs::Image>("/camera/depth/image_rect_raw", 1);
     ros::Publisher pub_image_infrared_left = nh_.advertise<sensor_msgs::Image>("/camera/infra1/image_rect_raw", 1);
@@ -298,6 +299,8 @@ int main(int argc, char * argv[]) try
     //auto color_stream = profile.get_stream(RS2_STREAM_COLOR);
     //rs2::rs2_extrinsics e = depth_stream.get_extrinsics_to(color_stream);
     
+    cv::Mat mat_depth_8b(Size(DEPTH_WIDTH, DEPTH_HEIGHT), CV_8U);
+
     while (nh_.ok() && waitKey(1) < 0) 
     {
         cnt++;
@@ -369,14 +372,18 @@ int main(int argc, char * argv[]) try
             // SEND FRAME DATA TO OPENCV MATRICES //
             ////////////////////////////////////////
 
-            // Obtain 16-bit matrix for calculations
+            // Obtain 16-bit depth matrix
             // https://stackoverflow.com/questions/6909464/convert-16-bit-depth-cvmat-to-8-bit-depth
-            cv::Mat mat_depth_raw(Size(DEPTH_WIDTH, DEPTH_HEIGHT), CV_16U, (void*)(frame_depth.get_data()), Mat::AUTO_STEP);
-                       
+            cv::Mat mat_depth_16b(Size(DEPTH_WIDTH, DEPTH_HEIGHT), CV_16U, (void*)(frame_depth.get_data()), Mat::AUTO_STEP);
+      
+            // Convert to 8-bit depth matrix (for sensor_msgs::Image)
+            // https://stackoverflow.com/questions/6909464/convert-16-bit-depth-cvmat-to-8-bit-depth
+            mat_depth_16b.convertTo(mat_depth_8b, CV_8U, 0.00390625); // Note: 1/256 = 0.00390625
+
             // Obtain depth image (meters) for calculations
             //https://stackoverflow.com/questions/6302171/convert-uchar-mat-to-float-mat-in-opencv
             cv::Mat mat_depth_meters;
-            mat_depth_raw.convertTo(mat_depth_meters, CV_32F, scale); //0.00390625); // Note: 1/256 = 0.00390625
+            mat_depth_16b.convertTo(mat_depth_meters, CV_32F, scale); //0.00390625); // Note: 1/256 = 0.00390625
 
             // Copy one row of depth image to a new matrix
             cv::Mat vec_depth_meters(Size(DEPTH_WIDTH, 0), CV_32F);
@@ -384,6 +391,15 @@ int main(int argc, char * argv[]) try
 
             // CURRENTLY, DOES NOT WORK BECAUSE SENSOR_MSGS CAN ONLY ACCEPT 8BIT IMAGES...
             
+            ////////////////////////////////////////////////
+            // CONVERT 8-BIT CV:MAT to SENSOR_MSGS::IMAGE //
+            ////////////////////////////////////////////////
+            cv_bridge::CvImage cv_image_depth_8b;
+            cv_image_depth_8b.image = mat_depth_8b;
+            cv_image_depth_8b.encoding = "mono8";
+            sensor_msgs::Image ros_image_depth_8b;
+            cv_image_depth_8b.toImageMsg(ros_image_depth_8b);
+
             //////////////////////////////////////////
             // CONVERT CV:MAT to SENSOR_MSGS::IMAGE //
             //////////////////////////////////////////
@@ -397,13 +413,14 @@ int main(int argc, char * argv[]) try
             if (cnt == 10)
             {	                
                 // https://stackoverflow.com/questions/7970988/print-out-the-values-of-a-mat-matrix-in-opencv-c
-                cout << "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n depth image [m] = "<< endl << " "  << mat_depth_meters << endl << endl;
+                cout << "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n depth image [m] = "<< endl << " "  << mat_depth_8b << endl << endl;
                 cout << "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n depth vector [m] = "<< endl << " "  << vec_depth_meters << endl << endl;
             }
 
             ////////////////////////////////////////
             // PUBLISH ROS MESSAGES TO ROS TOPICS //
             ////////////////////////////////////////
+            pub_image_depth_8b.publish(ros_image_depth_8b);
             pub_image_depth_meters.publish(ros_image_depth_meters);
 
             if(DEPTH_RGB_FLAG)

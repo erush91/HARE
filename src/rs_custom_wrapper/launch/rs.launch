@@ -6,7 +6,7 @@
 		<!-- OPERATE THE INFRARED LASER (NECESSARY TO GET DEPTH IMAGE) -->
 		<param name="LASER_FLAG" type="boolean" value="1"/>
 
-		<!-- COMPUTE & PUBLISH 32-BIT FLOAT DEPTH IMAGE -->
+		<!-- COMPUTE & PUBLISH DEPTH IMAGE -->
 		<param name="DEPTH_FLAG" type="boolean" value="1"/>
 
 		<!-- DEPTH IMAGE PARAMETERS -->
@@ -14,10 +14,10 @@
                 <param name="DEPTH_HEIGHT" type="int" value="480"/>
                 <param name="DEPTH_FPS" type="int" value="30"/>
 
-                <!-- COMPUTE & PUBLISH 8-BIT RGB DEPTH IMAGE -->
+                <!-- COMPUTE & PUBLISH RGB DEPTH IMAGE -->
                 <param name="DEPTH_RGB_FLAG" type="boolean" value="0"/>
 
-                <!-- COMPUTE & PUBLISH 8-BIT MONOCHROME INFRARED IMAGE -->
+                <!-- COMPUTE & PUBLISH MONOCHROME INFRARED IMAGE -->
                 <param name="INFRARED_FLAG" type="boolean" value="0"/>
 
 		<!-- INFRARED IMAGE PARAMETERS -->
