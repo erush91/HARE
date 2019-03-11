@@ -17,6 +17,9 @@
                 <!-- COMPUTE & PUBLISH RGB DEPTH IMAGE -->
                 <param name="DEPTH_RGB_FLAG" type="boolean" value="0"/>
 
+                <!-- COMPUTE & PRINT DEPTH METERS MATRIX -->
+                <param name="DEPTH_METERS_FLAG" type="boolean" value="0"/>
+
                 <!-- COMPUTE & PUBLISH MONOCHROME INFRARED IMAGE -->
                 <param name="INFRARED_FLAG" type="boolean" value="0"/>
 
