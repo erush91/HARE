@@ -39,11 +39,8 @@ int main(int argc, char * argv[]) try
     ////////////////////
 
     bool CV_IMSHOW_VISUALIZER_FLAG = 0;
-
     bool DEPTH_RGB_FLAG = 0;
-
     bool DEPTH_METERS_FLAG = 0;
-
     bool LASER_FLAG = 0;
 
     bool DEPTH_FLAG = 0;
@@ -117,14 +114,12 @@ int main(int argc, char * argv[]) try
 
     // Configured left infrared stream
     // https://github.com/IntelRealSense/librealsense/issues/1140
-    cfg.enable_stream(RS2_STREAM_INFRARED, 1, INFRARED_WIDTH, INFRARED_HEIGHT, RS2_FORMAT_Y8, INFRARED_FPS);
+    if (INFRARED_FLAG)
+    {
+        cfg.enable_stream(RS2_STREAM_INFRARED, 1, INFRARED_WIDTH, INFRARED_HEIGHT, RS2_FORMAT_Y8, INFRARED_FPS);
+        cfg.enable_stream(RS2_STREAM_INFRARED, 2, INFRARED_WIDTH, INFRARED_HEIGHT, RS2_FORMAT_Y8, COLOR_FPS);
+    }
     
-    // Configured right infrared stream
-    cfg.enable_stream(RS2_STREAM_INFRARED, 2, INFRARED_WIDTH, INFRARED_HEIGHT, RS2_FORMAT_Y8, COLOR_FPS);
-
-    // Configured right infrared stream
-    //cfg.enable_stream(RS2_STREAM_COLOR, COLOR_WIDTH, COLOR_HEIGHT, RS2_FORMAT_BGR8, COLOR_FPS);
-
     // Instruct pipeline to start streaming with the requested configuration
     rs2::pipeline_profile profile = pipe.start(cfg);
 
@@ -274,14 +269,23 @@ int main(int argc, char * argv[]) try
         
     using namespace cv;
     const auto window_name_depth = "Depth";
-    namedWindow(window_name_depth, WINDOW_AUTOSIZE);
-    
     const auto window_name_infrared_left = "IR (Left)";
-    namedWindow(window_name_infrared_left, WINDOW_AUTOSIZE);
-
     const auto window_name_infrared_right = "IR (Right)";
-    namedWindow(window_name_infrared_right, WINDOW_AUTOSIZE);
+        
+    if (CV_IMSHOW_VISUALIZER_FLAG)
+    {
+        if (DEPTH_FLAG)
+        {
+            namedWindow(window_name_depth, WINDOW_AUTOSIZE);
+        }
     
+        if (INFRARED_FLAG)
+        {
+            namedWindow(window_name_infrared_left, WINDOW_AUTOSIZE);        
+            namedWindow(window_name_infrared_right, WINDOW_AUTOSIZE);
+        }
+    }
+
     //////////////////////////////
     // CONFIGURE ROS PUBLISHERS //
     //////////////////////////////
@@ -289,7 +293,6 @@ int main(int argc, char * argv[]) try
     // Publish sensor_msgs::Image
     // https://answers.ros.org/question/99831/publish-file-to-image-topic/
 
-    ros::Publisher pub_image_depth_8b = nh_.advertise<sensor_msgs::Image>("/camera/depth_8b/image_rect_raw", 1);
     ros::Publisher pub_image_depth_RGB = nh_.advertise<sensor_msgs::Image>("/camera/depth_RGB/image_rect_raw", 1);
     ros::Publisher pub_image_depth_meters = nh_.advertise<sensor_msgs::Image>("/camera/depth/image_rect_raw", 1);
     ros::Publisher pub_image_infrared_left = nh_.advertise<sensor_msgs::Image>("/camera/infra1/image_rect_raw", 1);
@@ -302,8 +305,9 @@ int main(int argc, char * argv[]) try
     //auto depth_stream = profile.get_stream(RS2_STREAM_DEPTH);
     //auto color_stream = profile.get_stream(RS2_STREAM_COLOR);
     //rs2::rs2_extrinsics e = depth_stream.get_extrinsics_to(color_stream);
-    
-    cv::Mat mat_depth_8b(Size(DEPTH_WIDTH, DEPTH_HEIGHT), CV_8U);
+
+    // Pre-allocate the depth matrix
+    cv::Mat mat_depth_meters(Size(DEPTH_WIDTH, DEPTH_HEIGHT), CV_32FC1);
 
     while (nh_.ok() && waitKey(1) < 0) 
     {
@@ -358,7 +362,7 @@ int main(int argc, char * argv[]) try
         // PRINT FRAME # TO TERMINAL //
         ///////////////////////////////
 
-        //cout << "Frame # " << cnt << endl;
+        cout << "Frame # " << cnt << endl;
 
         //////////////////////////////
         // WAIT FOR REALSENSE FRAME //
@@ -380,65 +384,18 @@ int main(int argc, char * argv[]) try
             ////////////////////////////////////////
 
             // Obtain 16-bit depth matrix
-            // https://stackoverflow.com/questions/6909464/convert-16-bit-depth-cvmat-to-8-bit-depth
             cv::Mat mat_depth_16b(Size(DEPTH_WIDTH, DEPTH_HEIGHT), CV_16U, (void*)(frame_depth.get_data()), Mat::AUTO_STEP);
-      
-            // Convert to 8-bit depth matrix (for sensor_msgs::Image)
-            // https://stackoverflow.com/questions/6909464/convert-16-bit-depth-cvmat-to-8-bit-depth
-            mat_depth_16b.convertTo(mat_depth_8b, CV_8U, 0.00390625); // Note: 1/256 = 0.00390625
-
-            // Copy one row of depth image to a new matrix
-            cv::Mat vec_depth_8b(Size(DEPTH_WIDTH, 0), CV_8U);
-            vec_depth_8b.push_back(mat_depth_8b.row(int(DEPTH_HEIGHT-1)));
-            
-            ////////////////////////////////////////////////
-            // CONVERT 8-BIT CV:MAT to SENSOR_MSGS::IMAGE //
-            ////////////////////////////////////////////////
-            cv_bridge::CvImage cv_image_depth_8b;
-            cv_image_depth_8b.image = mat_depth_8b;
-            cv_image_depth_8b.encoding = "mono8";
-            sensor_msgs::Image ros_image_depth_8b;
-            cv_image_depth_8b.toImageMsg(ros_image_depth_8b);
-
-            // PRINT MATRIX ONCE
-            if (cnt == 10)
-            {	                
-                // https://stackoverflow.com/questions/7970988/print-out-the-values-of-a-mat-matrix-in-opencv-c
-                cout << "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n 8-BIT DEPTH MATRIX [0-255]  = "<< endl << " "  << mat_depth_8b << endl << endl;
-                cout << "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n 8-BUT DEPTH ROW [0-255] = "<< endl << " "  << vec_depth_8b << endl << endl;
-            }
 
             ////////////////////////////////////////
             // PUBLISH ROS MESSAGES TO ROS TOPICS //
             ////////////////////////////////////////
-            pub_image_depth_8b.publish(ros_image_depth_8b);
-
-            if(DEPTH_METERS_FLAG)
-            {
-                // Obtain depth image (meters) for calculations
-                //https://stackoverflow.com/questions/6302171/convert-uchar-mat-to-float-mat-in-opencv
-                cv::Mat mat_depth_meters;
-                mat_depth_16b.convertTo(mat_depth_meters, CV_32F, scale); //0.00390625); // Note: 1/256 = 0.00390625
-            
-                // Copy one row of depth image to a new matrix
-                cv::Mat vec_depth_meters(Size(DEPTH_WIDTH, 0), CV_32F);
-                vec_depth_meters.push_back(mat_depth_meters.row(int(DEPTH_HEIGHT-1)));
-
-                // PRINT MATRIX ONCE
-                if (cnt == 10)
-                {	                
-                    // https://stackoverflow.com/questions/7970988/print-out-the-values-of-a-mat-matrix-in-opencv-c
-                    cout << "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n 32-BIT FLOAT DEPTH MATRIX [m] = "<< endl << " "  << mat_depth_meters << endl << endl;
-                    cout << "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n 32-BIT FLOAT DEPTH ROW [m] = "<< endl << " "  << vec_depth_meters << endl << endl;
-                }
-            }
 
             if(DEPTH_RGB_FLAG)
             {
                 ////////////////////////
                 // APPLY RGB COLORMAP //
                 ////////////////////////
-                rs2::frame frame_depth_RGB = frame_depth.apply_filter(color_map); // Convert to depth image frame to RGB colormap////////////////////////////////////////
+                rs2::frame frame_depth_RGB = frame_depth.apply_filter(color_map);
                 
                 //////////////////////////////////////////////
                 // SEND FRAME DATA TO 8-BIT OPENCV MATRICES //
@@ -467,7 +424,27 @@ int main(int argc, char * argv[]) try
                 ////////////////////////////////////////
                 pub_image_depth_RGB.publish(ros_image_depth_RGB);
             }
+            
+            if(DEPTH_METERS_FLAG)
+            {
+                // Obtain depth image (meters) for calculations
+                //https://stackoverflow.com/questions/6302171/convert-uchar-mat-to-float-mat-in-opencv
+                mat_depth_16b.convertTo(mat_depth_meters, CV_32F, scale);
 
+                //////////////////////////////////////////
+                // CONVERT CV:MAT to SENSOR_MSGS::IMAGE //
+                //////////////////////////////////////////
+                cv_bridge::CvImage cv_image_depth_meters;
+                cv_image_depth_meters.image = mat_depth_meters;
+                cv_image_depth_meters.encoding = "mono16";
+                sensor_msgs::Image ros_image_depth_meters;
+                cv_image_depth_meters.toImageMsg(ros_image_depth_meters);
+
+                ////////////////////////////////////////
+                // PUBLISH ROS MESSAGES TO ROS TOPICS //
+                ////////////////////////////////////////
+                pub_image_depth_meters.publish(ros_image_depth_meters);
+            }
         }
 
         if(INFRARED_FLAG)
