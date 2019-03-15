@@ -1,0 +1,6 @@
+<launch>
+    <group>
+        <include file="$(find ros_pololu_servo)/launch/hare_pololu_config.xml" />
+        <include file="$(find rs_custom_wrapper)/launch/hare_rs_config.xml" />
+    </group>
+</launch>

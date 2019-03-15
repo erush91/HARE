@@ -121,6 +121,7 @@ int main(int argc, char * argv[]) try
     }
     
     // Instruct pipeline to start streaming with the requested configuration
+    cout << "Starting RealSense..." << endl;
     rs2::pipeline_profile profile = pipe.start(cfg);
 
     /////////////////////////////////
@@ -223,7 +224,7 @@ int main(int argc, char * argv[]) try
     // auto dev0 = device_list[0];
 
     // // Enter advanced mode
-    // if (dev0.is<rs400::advanced_mode>())
+    // if (dev0.is<rs400::advanced_mode>())pub_image_depth_8b
     // {
     //     // Get the advanced mode functionality
     //     auto advanced_mode_dev = dev0.as<rs400::advanced_mode>();
@@ -323,27 +324,29 @@ int main(int argc, char * argv[]) try
             // PRINT DEPTH FRAME SIZE TO TERIMINAL //
             /////////////////////////////////////////
 
-            cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" << endl;
-            cout << "CV_IMSHOW_VISUALIZER_FLAG: " << CV_IMSHOW_VISUALIZER_FLAG << endl;
-            cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" << endl;
-            cout << "DEPTH_RGB_FLAG: " << DEPTH_RGB_FLAG << endl;
-            cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" << endl;
-            cout << "DEPTH_METERS_FLAG: " << DEPTH_METERS_FLAG << endl;      
-            cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" << endl;
-            cout << "LASER_FLAG: " << LASER_FLAG << endl;
-            cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" << endl;
-            cout << "DEPTH_FLAG: " << DEPTH_FLAG << endl;
-            cout << "DEPTH FRAME SIZE: [" << DEPTH_WIDTH << ", " << DEPTH_HEIGHT << "]" << endl;
-            cout << "DEPTH_FPS: " << DEPTH_FPS << endl;
-            cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" << endl;
-            cout << "INFRARED_FLAG: " << INFRARED_FLAG << endl;
-            cout << "INFRARED FRAME SIZE: [" << INFRARED_WIDTH << ", " << INFRARED_HEIGHT << "]" << endl;
-            cout << "INFRARED_FPS: " << INFRARED_FPS << endl;
-            cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" << endl;
-            cout << "COLOR_FLAG: " << COLOR_FLAG << endl;
-            cout << "COLOR FRAME SIZE: [" << COLOR_WIDTH << ", " << COLOR_HEIGHT << "]" << endl;
-            cout << "COLOR_FPS: " << COLOR_FPS << endl;
-            cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" << endl;
+            cout << "Collecting data..." << endl;
+
+            //cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" << endl;
+            //cout << "CV_IMSHOW_VISUALIZER_FLAG: " << CV_IMSHOW_VISUALIZER_FLAG << endl;
+            //cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" << endl;
+            //cout << "DEPTH_RGB_FLAG: " << DEPTH_RGB_FLAG << endl;
+            //cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" << endl;
+            //cout << "DEPTH_METERS_FLAG: " << DEPTH_METERS_FLAG << endl;      
+            //cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" << endl;
+            //cout << "LASER_FLAG: " << LASER_FLAG << endl;
+            //cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" << endl;
+            //cout << "DEPTH_FLAG: " << DEPTH_FLAG << endl;
+            //cout << "DEPTH FRAME SIZE: [" << DEPTH_WIDTH << ", " << DEPTH_HEIGHT << "]" << endl;
+            //cout << "DEPTH_FPS: " << DEPTH_FPS << endl;
+            //cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" << endl;
+            //cout << "INFRARED_FLAG: " << INFRARED_FLAG << endl;
+            //cout << "INFRARED FRAME SIZE: [" << INFRARED_WIDTH << ", " << INFRARED_HEIGHT << "]" << endl;
+            //cout << "INFRARED_FPS: " << INFRARED_FPS << endl;
+            //cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" << endl;
+            //cout << "COLOR_FLAG: " << COLOR_FLAG << endl;
+            //cout << "COLOR FRAME SIZE: [" << COLOR_WIDTH << ", " << COLOR_HEIGHT << "]" << endl;
+            //cout << "COLOR_FPS: " << COLOR_FPS << endl;
+            //cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" << endl;
             //ROS_INFO("%d", rs2_extrinsics); 
             /////////////////////////
             // INITIALIZE MATRICES //
@@ -362,7 +365,7 @@ int main(int argc, char * argv[]) try
         // PRINT FRAME # TO TERMINAL //
         ///////////////////////////////
 
-        cout << "Frame # " << cnt << endl;
+        //cout << "Frame # " << cnt << endl;
 
         //////////////////////////////
         // WAIT FOR REALSENSE FRAME //
