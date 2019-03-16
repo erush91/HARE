@@ -24,8 +24,6 @@ import numpy as np
 # ~ Local Libraries ~
 from MathKit import eq_margin , round_small , eq
 
-# set_dbg_lvl(1) # Transformation of objects contained in Frames
-
 # ~~ Constants , Shortcuts , Aliases ~~
 EPSILON = 1e-7
 infty = 1e309 # URL: http://stackoverflow.com/questions/1628026/python-infinity-any-caveats#comment31860436_1628026
@@ -53,7 +51,7 @@ def vec_dif_mag( vec1 , vec2 ):
     return vec_mag( np.subtract( vec1 , vec2 ) )
 
 def vec_dif_unt( vec1 , vec2 ):
-    """ Return the unit of the vector difference between 'vec1' and 'vec2' """
+    """ Return the unit vector difference between 'vec1' and 'vec2' """
     return vec_unit( np.subtract( vec1 , vec2 ) )
 
 def vec_zeros( dim ):
@@ -116,10 +114,10 @@ def vec_NaN( dim ):
     """ Return a row vector of dimension 'dim' composes of NaN """
     return [ float('NaN') for i in xrange( dim ) ]
 
-def np_add(*args): # <<< resenv
+def np_add( *args ):
     """ Perform 'np.add' on more than two args """
-    if len(args) > 2: # If there are more than 2 args, add the first arg to recur on remainder of args
-        return np.add( args[0] , np_add(*args[1:]) ) # Note the star operator is needed for recursive call, unpack to positional args
+    if len( args ) > 2: # If there are more than 2 args, add the first arg to recur on remainder of args
+        return np.add( args[0] , np_add( *args[1:] ) ) # Note the star operator is needed for recursive call, unpack to positional args
     else: # base case, there are 2 args*, use vanilla 'np.add'
         return np.add( args[0] , args[1] ) # *NOTE: This function assumes there are at least two args, if only 1 an error will occur
 
@@ -137,7 +135,7 @@ def np_subtract(*args): # <<< resenv
     else: # base case, there are 2 args*, use vanilla 'np.subtract'
         return np.subtract( args[0] , args[1] ) # *NOTE: This function assumes there are at least two args, if only 1 an error will occur
 
-def vec_sum_chain(vecList): # <<< resenv
+def vec_sum_chain( vecList ): 
     """ Create a list of vectors that are the resultants of summing correspong vector in 'vecList' and all preceding vectors """
     ptsList = [ vecList[0][:] ] # first vector is the same as first in 'vecList'
     for i in range(1,len(vecList)): # for every successive vector
@@ -196,7 +194,7 @@ def is_vector( vec ):
     """ Return true if 'vec' is any of { list , numpy array } and thus may particpate in vector operations """
     return isinstance( vec , ( list , np.ndarray ) )
 
-def vec_copy( vec ): # <<< resenv
+def vec_copy( vec ): 
     """ Return a copy of 'vec', using the appropriate copy mechanism for the underlying datatype """
     if isinstance( vec , list ): 
         return vec[:] 
@@ -205,7 +203,7 @@ def vec_copy( vec ): # <<< resenv
     else:
         raise TypeError("vec_copy: " + str(vec) + " was neither a 'list' nor a 'np.ndarray'!")
 
-def vec_copy_deep( vec ): # <<< resenv
+def vec_copy_deep( vec ): 
     """ Return a deep copy of 'vec', using the appropriate copy mechanism for the underlying datatype """
     if isinstance( vec , list ): 
         return deepcopy( vec )

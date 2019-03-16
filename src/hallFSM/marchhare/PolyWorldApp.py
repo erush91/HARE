@@ -15,46 +15,60 @@ Tkinter simulation environment for 2D polygons
 """
 
 # ~ Standard Libraries ~
+import os
 import time # --------- For calculating framerate
 from Tkinter import * # Standard Python cross-platform GUI
+from math import sqrt
 # ~ Special Libraries ~
 import numpy as np
 # ~ Local Libraries ~
-from Vector2D import SimFrame2D , Segment , Poly2D
+from VectorMath.Vector2D import SimFrame2D , Segment , Poly2D
 
 # ~~ Constants , Shortcuts , Aliases ~~
-
+EPSILON = 1e-7
+infty   = 1e309 # URL: http://stackoverflow.com/questions/1628026/python-infinity-any-caveats#comment31860436_1628026
+endl    = os.linesep
+sqt2    = sqrt(2)
 
 # == Poly2D Tkinter App ==
 
-class Poly2DApp(object):
+class Poly2DApp( object ):
     """ A Tkinter display to display 2D polygon worlds """
     
     def __init__( self , winWidth , winHeight ):
         global FLATORIGIN
         # 1. Init Tkinter root
-        self.winWidth = winWidth
-        self.winHeight = winHeight
-        self.orgnScale = min( self.winHeight , self.winWidth ) * 2/3.0
+        self.winWidth    = winWidth
+        self.winHeight   = winHeight
+        self.orgnScale   = min( self.winHeight , self.winWidth ) * 2/3.0
         self.renderScale = 1 # 1/2.0
-        self.rootWin = Tk()
-        # self.rootWin.wm_title("Polygon Playground") # No default title
-        self.rootWin.protocol("WM_DELETE_WINDOW", self.callback_destroy)
-        self.calcFunc = [ self.dummy_calculation ] # Should really be loaded with something before running
-        self.winRunning = False
-        self.simFrame = SimFrame2D( [ [ -self.winWidth/2 , -self.winHeight/2 ] , [ self.winWidth/2 , self.winHeight/2 ] ] ) 
-        self.simFrame.name = "simFrame" # Just in case someone asks
+        self.rootWin     = Tk()
+        # 2. Set up animation
+        self.calcFunc      = [ self.dummy_calculation ] # ----------------------------- Should really be loaded with something before running
+        self.winRunning    = True # --------------------------------------------------- Then you had better go and catch it!
+        self.simFrame      = SimFrame2D( [ [ -self.winWidth/2 , -self.winHeight/2 ] , # Where the action is!
+                                           [ self.winWidth/2 , self.winHeight/2   ] ] ) 
+        self.simFrame.name = "simFrame" # --------------------------------------------- Just in case someone asks
+        self.last          = -infty # ------------------------------------------------- Init animation loop timer
+        self.stepTime      = 1000 // 24 # --------------------------------------------- Number of [ms] between frames
+        self.rootWin.protocol( "WM_DELETE_WINDOW" , self.callback_destroy ) # --------- Try to exit cleanly, but it never really works
         # 2. Set up window
-        self.canvas = Canvas(self.rootWin, width=self.winWidth, height = self.winHeight)
-        self.canvas.config(background='black')
-        self.FLATORIGIN = [self.winWidth/2, self.winHeight/2]
+        self.canvas     = Canvas( self.rootWin , width = self.winWidth , height = self.winHeight )
+        self.FLATORIGIN = [ self.winWidth/2 , self.winHeight/2 ]
         FLATORIGIN = self.FLATORIGIN
+        self.canvas.config( background = 'black' )
         self.set_stage()
         # 3. Pack window
-        self.canvas.grid(row=1, column=1)
-        # self.init_controls()
-        self.last = -infty # Init animation loop timer
-        self.stepTime = 80 # Number of ms between frames
+        self.canvas.grid( row = 1 , column = 1 )
+        # 4. Create a temp list
+        self.tempHandles = []
+        
+    def flush_temp( self ):
+		""" Destroy all temp objects """
+		# URL , Delete canvas objects
+		for handle in self.tempHandles:
+			self.canvas.delete( handle ) # It is not an error to give an item specifier that doesn’t match any items.
+		self.tempHandles = []
 
     def set_title( self , winTitle ):
         """ Set the title for the Tkinter window """
@@ -89,11 +103,11 @@ class Poly2DApp(object):
         #self.controlPanel = Frame(self.rootWin) # A panel to hold the controls, has its own packing environment
         pass
         
-    def callback_destroy(self):
+    def callback_destroy( self ):
         """ Ask the window to self-destruct """
         self.winRunning = False
         self.rootWin.destroy()
-        exit()
+        #~ exit()
     
     def update_Frames(self , currFrame):
         for obj in currFrame.objs:
@@ -144,9 +158,16 @@ class Poly2DApp(object):
             for obj in rootFrame.objs:
                 obj.set_color( pColor )   
         for frame in rootFrame.subFrames:
-            self.color_all( pColor , frame )    
+            self.color_all( pColor , frame )
+            
+    def temp_points( self , ptsList , size , color ):
+        """ Draw circular points to the canvas """
+        side = 1/sqt2 * size/2
+        for pnt in ptsList:
+            x = pnt[0] ; y = pnt[1]
+            self.tempHandles.append(  self.canvas.create_oval( x-side , y-side , x+side , y+side , outline = color , fill = color )  )
 	
-    def run(self):
+    def run( self ):
 #        for segment in self.staticSegments: # Draw world axes
 #            segment.update() # These will never change, draw them safely at the beginning
             
@@ -157,11 +178,11 @@ class Poly2DApp(object):
         # 4.b. Send new coords to segments
         self.simFrame.transform_contents() # one of these contains the redundant update
         self.update_Frames( self.simFrame ) # Is this the redundant update?
-        # 4.c. Take input from widgets
         
         # 4.f. Update window
         self.canvas.update() 
         self.rootWin.update_idletasks()
+        
         # 4.d. Wait remainder of 40ms
         elapsed = time.time() * 1000 - self.last
         if elapsed < self.stepTime:
@@ -171,6 +192,14 @@ class Poly2DApp(object):
         # 4.e. Mark beginning of next loop
         self.last = time.time() * 1000  
         self.rootWin.after( sleepTime , self.run )
+        
+        # 4.c. Destroy temp objects
+        self.flush_temp()
+        
+        # 5. Shutdown if flag
+        if self.winRunning == False:
+			self.callback_destroy()
+        
 	#print "looping"
 
 
@@ -178,7 +207,7 @@ class Poly2DApp(object):
 
 if __name__ == "__main__":
     # File that runs the poly sim should import this library
-    # from PolyWorldApp import *
+    # from marchhare.PolyWorldApp import *
 
     # Create objects to add to the simulation
     hept = Poly2D.regular( 7 , 200 , [0,0] , np.pi / 17 )
@@ -193,7 +222,7 @@ if __name__ == "__main__":
     foo.set_title( "Sim Window Test" ) # This will appear in the top bar of the simulation window
     
     # ~~ Setup ~~
-    foo.calcFunc = update_shape # ------ Give the app work to do each frame
+    foo.calcFunc = [ update_shape ] # ------ Give the app work to do each frame
     foo.attach_drawables( hept ) # ----- Add Frame2D/Poly objects to the world so that they can be drawn
     foo.color_all( 'green' ) # --------- Default segment color is black 
                                          # TODO: Make a new default color!

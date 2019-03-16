@@ -34,7 +34,7 @@ infty = 1e309 # URL: http://stackoverflow.com/questions/1628026/python-infinity-
 
 # == Coordinate Transform 2D ==
 
-def polr_2_cart(polarCoords): # usual conversion # <<< resenv
+def polr_2_cart( polarCoords ): # usual conversion 
     """ Convert polar coordinates [radius , angle (radians)] to cartesian [x , y]. Theta = 0 is X+ """
     return [ polarCoords[0] * cos(polarCoords[1]) , polarCoords[0] * sin(polarCoords[1]) ]
     # TODO : Look into imaginary number transformation and perform a benchmark
@@ -238,7 +238,7 @@ def intersect_ray_seg_pnt_2D( ray , seg , endPoints = True , slideCoincident = F
 
 # TODO: Rewrite all the intersection functions this way so that we don't have to have a bunch of versions based on the needs of client code
 
-def intersect_ray_seg_pnt_frac_2D( ray , seg ): # <<< resenv
+def intersect_ray_seg_pnt_frac_2D( ray , seg ): 
     """ if 'ray' and line 'seg' intersect, then return intersection point , otherwise return false 
     endPoints = False: Ignore intersections that happen at the segment endpoints
     slideCoincident = True: Count the case where the segment and the ray are coincident as non-intersecting """
@@ -626,7 +626,7 @@ class Pose2D(object): # <<< resenv
 
 # - Class Frame2D - 
        
-class Frame2D(Pose2D): # <<< resenv
+class Frame2D( Pose2D ): 
     """ A Frame is a container for geometric objects, it is defined by a Pose that is relative to the parent Frame 
     
     self.position: ---------- position in the parent frame , a position added to upstream frames
@@ -636,7 +636,7 @@ class Frame2D(Pose2D): # <<< resenv
     """
     
     def __init__( self , pPos , pTheta , *containedObjs ):
-        super(Frame2D, self).__init__( pPos , pTheta ) # This object inherits Pose2D, and uses position and orientation to define its state
+        super( Frame2D , self ).__init__( pPos , pTheta ) # This object inherits Pose2D, and uses position and orientation to define its state
         self.labPose = Pose2D() # The lab pose: position and orientation in the lab frame
         self.ntnPose = Pose2D() # The notional pose: Used to make "what-if" calculations without creating a new object or disturbing present coords
         self.objs = list(containedObjs) if containedObjs else [] # List of contained drawable objects
@@ -739,6 +739,12 @@ class Frame2D(Pose2D): # <<< resenv
         """ Express a 'vec' specified in the local frame in the lab frame """
         labRelative = self.labPose.orientation.apply_to( vec ) # This function assumes that at least one update has occurred
         return np.add( self.labPose.position , labRelative )
+        
+    def pts_to_lab( self , ptsLst ):
+        rtnPts = []
+        for pnt in ptsLst:
+            rtnPts.append( self.local_to_lab( pnt ) )
+        return rtnPts
         
     def get_lab_bases( self ):
         """ Return the origin and the basis vectors if this frame """
@@ -1036,7 +1042,7 @@ class Frame2D(Pose2D): # <<< resenv
         
 # - End Frame2D -        
         
-class CollideList(list):
+class CollideList( list ):
     """ Container for Poly2Ds , helper class for SimFrame , Toggle collision detection """
     # NOTE: This is not strictly required for collision detection, but could possibly help if there are groups of objects to collide
     
@@ -1147,7 +1153,7 @@ def sides_from_vertices( vertList ):
     
 # == class Segment ==
 
-class Segment(object): # <<< resenv
+class Segment( object ): 
     """ A line segment to be displayed on a Tkinter canvas """ # TODO: * Generalize for any display?
 #                                                                      * Consider extending this class for particular displays?
 
@@ -1198,7 +1204,7 @@ class Segment(object): # <<< resenv
         self.canvas.itemconfig(self.drawHandle,fill=color)
         self.canvas.itemconfig(self.drawHandle, width=3)
         
-    def attach_to_canvas(self, TKcanvas): # candidate super function
+    def attach_to_canvas( self , TKcanvas ): # candidate super function
         """ Given a 'TKcanvas', create the graphics widget and attach it to the that canvas """
         self.drawHandle = TKcanvas.create_line( -10 , -10 , -5 , -5 ) # Init to dummy coords x1, y1 , x2 , y2
         self.canvas = TKcanvas
@@ -1221,7 +1227,7 @@ class Segment(object): # <<< resenv
 
 # == End Segment ==
                     
-class Poly2D(Frame2D): # <<< resenv
+class Poly2D( Frame2D ): 
     """ Represents a closed polygon in 2 dimensions, not necessarily convex or simple """
     
     def __init__( self , pPos , pTheta , *pointsCCW ):
@@ -1637,209 +1643,6 @@ def next_part_collide_floor( ntnSupportSeg , nextPart , nextNtnPose , floor = No
 
 # == End 2D ==
 
-# === Assembly Planning Frames ===
-
-# == class Design ==
-
-# ~~ USAGE ~~
-# 1. All parts MUST have a unique name so that a one-to-one relationship can be established between the Design and the simulated part representation
-        
-class Design(Frame2D):
-    """ Represents a 'CAD model' of a 2D assemblage of polygons """
-    
-    def __init__( self , pPos , pTheta , *subPolys ):
-        """ Set this object up as a 2D frame """
-        super( Design , self ).__init__( pPos , pTheta )
-        self.graph = None # Holds the assembly order graph, has the same Pose as the associated Design # IS THIS EVEN USED? # Comment out and see what breaks
-        for poly in subPolys:
-            self.attach_sub( poly ) 
-        self.name = None
-        
-    def __str__( self ):
-        """ Return a string summary of the Design """
-        return "Design , Name: " + str( self.name ) + " , Number of parts: " + str( len( self.subFrames ) ) + \
-               " , Part names: " + str( [part.name for part in self.subFrames] )
-           
-    def get_part_index_w_name( self , partName ):
-        """ Search for a member 'partName' and return the index if found, otherwise return None """
-        for pDex , poly in enumerate( self.subFrames ):
-            if poly.name == partName:
-                return pDex
-        return None
-        
-    def get_part_by_name( self , partName ):
-        """ Return a reference to a part associated with the name given """
-        return self.subFrames[ self.get_part_index_w_name( partName ) ]
-        
-    def get_all_part_names( self ):
-        """ Return all the part names for this Design """
-        rtnNames = []
-        for poly in self.subFrames:
-            rtnNames.append( poly.name )
-        return rtnNames 
-
-    def active_names_list( self , active = True ):
-        """ Return a list of part names with their 'collActive' flags set to 'active'  """
-        rtnNames = []
-        for frame in self.subFrames:
-            if frame.collActive == active:
-                rtnNames.append( frame.name )
-        return rtnNames    
-          
-    def get_target_Pose_by_name( self , partName , frame = 'lab' ): # Use this to get the target of RRT build operations
-        """ Return a Pose2D representing where 'partName' belongs in the lab frame , if 'partName' does not exist, return None """
-        index = self.get_part_index_w_name( partName ) # Get the part index or None if name DNE
-        if index != None:
-            return self.subFrames[ index ].get_Pose( frame ) # Get the part pose in the specified frame
-        else:
-            return None # The part name was not found , return None
-            
-    def copy_parts( self ):
-        """ Return copies of all the parts of the design in order to use them for assembly """
-        partList = []
-        for part in self.subFrames:
-            temp = part.get_copy()
-            temp.collActive = True # serving part to the simulation, collide
-            partList.append( temp )
-        return partList
-        
-    def part_refs_list( self ):
-        """ Return a list of references to the Design non-colliding parts """
-        return self.subFrames[:] # Return a shallow copy of the subframes list
-             
-    def get_copy( self , doCollide = False , preserveActive = False ):
-        """ Get a copy of this Design with optionally colliding parts """
-        partList = []
-        for part in self.subFrames:
-            temp = part.get_copy()
-            if preserveActive: # If we are preserving active flag across copies , ignore 'doCollide'
-                temp.collActive = part.collActive
-            else: # If we are not preserving active flag across copies , assign all parts 'doCollide'
-                temp.collActive = doCollide 
-            partList.append( temp )
-        rtnDesign = Design( self.position , self.orientation._theta , *partList )
-        rtnDesign.name = self.name
-        return rtnDesign
-    
-    def sub_Design_from_parts_list( self , partNames , doCollide = False ):
-        """ Return a Design object composes of only 'partNames' in their speicified relative positions """
-        subList = []
-        for name in partNames:
-            temp = self.get_part_by_name( name ).get_copy() # This will throw an error if the part name does not exist in the design!
-            temp.collActive = doCollide
-            subList.append( temp )
-        return Design( self.position , self.orientation._theta , *subList )
-            
-    def label_parts_enclosed( self ):
-        """ Iterate through all the parts and label them enclosed or not """
-        # allParts = self.part_refs_list()
-        for part in self.subFrames:
-            # part.enclosed = part.is_trapped_simple_lab( allParts )
-            part.enclosed = part.is_trapped_simple_lab( self.subFrames ) 
-            
-    def has_trapped_inactive( self ):
-        """ Return true if one of the inactive parts is trapped , use this to cache trappedness of unbuilt parts """
-        for part in self.subFrames:
-            if ( not part.collActive ) and part.enclosed:
-                return True
-        return False
-            
-    def label_parts_free( self ):
-        """ Iterate through all the parts and assess the freeness of each """
-        # allParts = self.part_refs_list()
-        for part in self.subFrames:
-            # part.freeness = part.freeness_simple_lab( allParts )
-            part.freeness = part.freeness_simple_lab( self.subFrames )
-            
-    def set_parts_colliding( self , active = True ):
-        """ Set all the parts to be collidable, the entire design is part of the simulation """
-        for frame in self.subFrames:
-            frame.set_colliding( active )
-            
-    def set_active_by_name( self , pName , active = True ):
-        """ Search for 'pName' and set the associated part 'active' """
-        self.get_part_by_name( pName ).set_colliding( active )
-        
-    def set_active_by_list( self , namesList , active = True ):
-        """ Set the 'active' state of each name in namesList """
-        for pName in namesList:
-            self.get_part_by_name( pName ).set_colliding( active )
-            
-    def set_active_by_list_exclusive( self , namesList , active = True ):
-        """ Set the 'active' state of each name in namesList , and set all other names to the opposite state """
-        for pName in self.get_all_part_names():
-            if pName in namesList: # Name is on the list , set to the desired state
-                self.get_part_by_name( pName ).set_colliding( active )
-            else: # else name is not on the list , set to opposite of the desired state
-                self.get_part_by_name( pName ).set_colliding( not active )
-                
-    def bbox_active_only( self , frame = "lab" , active = True ):
-        """ Return the bounding box of all the Design members that are 'active' """
-        appPts = []
-        for frame in self.subFrames:
-            if frame.collActive == active:
-                appPts.extend( frame.get_points( frame ) )
-            
-    def putdowns_from_part_list( self , partsList ):
-        """ Generate the putdown poses of an imaginal version of the design in which only 'partsList' is active """
-        temp = self.get_copy() # Gen a scratch copy
-        temp.set_active_by_list_exclusive( partsList ) # Activate the parts we are interested in and only those parts
-        temp.transform_contents() # Make sure everything is in the proper spot
-        temp.set_supports_for_hull( activeOnly = True ) # Calc the supports
-        return temp.hullPutdowns[:] # Return a copy of the hull putdowns
-        
-    def extent_scale( self , activeOnly = True ):
-        """ Return the diagononal of the bounding box of the relative points in order to offer a sense of scale """
-        return vec_dif_mag( *bbox_from_points( list( self.vertex_set_rel( activeOnly = activeOnly ) ) ) )
-        
-    def count_active_parts( self , active = True ):
-        """ Return the number of subFrames that have their flag set to 'active' """
-        count = 0
-        for frame in self.subFrames:
-            if frame.collActive == active:
-                count += 1
-        return count
-        
-# == End Design ==
-
-
-# == Stability and Placement ==
-
-def planar_poly_stability( vertices , centroid ):
-    """ Return a stability measure for each side of a closed polygon by projecting the 'centroid' onto each in turn """
-    # NOTE: This function does not check for the feasibility of resting on a side and assumes that the 'vertices' define a convex polygon
-    # NOTE: Stability listed according to the order of 'vertices' , a side is '[ vertices[i] , vertices[i+1] ]'
-    sideStability = []
-    for vDex in xrange( len( vertices ) ):
-        sideStability.append( proj_pnt_within_seg( centroid , [ elemw( vertices , vDex ) , elemw( vertices , vDex + 1 ) ] ) )
-    return sideStability
-    
-class Table(Poly2D):
-    """ Object representing a broad, flat surface on which parts and assemblies will be set """
-    
-    def __init__( self ,  ):
-        """ Create a thin rectangle with the center of the table at the origin , parts will not occupy negative y coords """
-        Poly2D.__init__( self , [ 0 , 0 ] , 0 , 
-                                [ -1000 , -1000 ] , [  1000 , -1000 ]  , [  1000 ,   0 ] ,  [ -1000 ,   0 ] )
-        self.name = "Table"
-
-def support_to_Pose( supportSeg ):
-    """ Given a supporting segment in the frame of the object to put down, return a Pose2D that placed the center of the support at [0,0] , within +y """
-    midpoint = vec_avg( *supportSeg ) #; print "midpoint" , midpoint
-    angle = ray_angle( supportSeg ) #; print "angle" , angle
-    return Pose2D( np.multiply( Turn( -angle ).apply_to( midpoint ) , -1 ) , -angle )
-    #      Pose2D( np.multiply( Turn( -angle ).apply_to( midpoint ) , -1 ) , -angle )
-    
-def parts_from_structures( structList , polyList = [] ):
-    """ Return a list of Poly2D references given a list of frames that may or may not be nested """
-    for struct in structList: # For each of the structures in the list
-        if hasattr( struct , "points" ):
-            polyList.append( struct )
-        parts_from_structures( struct.subFrames , polyList )
-    return polyList
-
-# == End Stability ==
-
 
 # == Geo Functions that Use Geo Objects ==
 
@@ -1852,3 +1655,211 @@ def perp_bisector_2D( segment ):
 perp_bisector_2D.turn = Turn( pi / 2 )
 
 # == End Geo Geo ==
+
+
+## === SPARE PARTS =========================================================================================================================
+
+#~ # === Assembly Planning Frames ===
+
+#~ # == class Design ==
+
+#~ # ~~ USAGE ~~
+#~ # 1. All parts MUST have a unique name so that a one-to-one relationship can be established between the Design and the simulated part representation
+        
+#~ class Design(Frame2D):
+    #~ """ Represents a 'CAD model' of a 2D assemblage of polygons """
+    
+    #~ def __init__( self , pPos , pTheta , *subPolys ):
+        #~ """ Set this object up as a 2D frame """
+        #~ super( Design , self ).__init__( pPos , pTheta )
+        #~ self.graph = None # Holds the assembly order graph, has the same Pose as the associated Design # IS THIS EVEN USED? # Comment out and see what breaks
+        #~ for poly in subPolys:
+            #~ self.attach_sub( poly ) 
+        #~ self.name = None
+        
+    #~ def __str__( self ):
+        #~ """ Return a string summary of the Design """
+        #~ return "Design , Name: " + str( self.name ) + " , Number of parts: " + str( len( self.subFrames ) ) + \
+               #~ " , Part names: " + str( [part.name for part in self.subFrames] )
+           
+    #~ def get_part_index_w_name( self , partName ):
+        #~ """ Search for a member 'partName' and return the index if found, otherwise return None """
+        #~ for pDex , poly in enumerate( self.subFrames ):
+            #~ if poly.name == partName:
+                #~ return pDex
+        #~ return None
+        
+    #~ def get_part_by_name( self , partName ):
+        #~ """ Return a reference to a part associated with the name given """
+        #~ return self.subFrames[ self.get_part_index_w_name( partName ) ]
+        
+    #~ def get_all_part_names( self ):
+        #~ """ Return all the part names for this Design """
+        #~ rtnNames = []
+        #~ for poly in self.subFrames:
+            #~ rtnNames.append( poly.name )
+        #~ return rtnNames 
+
+    #~ def active_names_list( self , active = True ):
+        #~ """ Return a list of part names with their 'collActive' flags set to 'active'  """
+        #~ rtnNames = []
+        #~ for frame in self.subFrames:
+            #~ if frame.collActive == active:
+                #~ rtnNames.append( frame.name )
+        #~ return rtnNames    
+          
+    #~ def get_target_Pose_by_name( self , partName , frame = 'lab' ): # Use this to get the target of RRT build operations
+        #~ """ Return a Pose2D representing where 'partName' belongs in the lab frame , if 'partName' does not exist, return None """
+        #~ index = self.get_part_index_w_name( partName ) # Get the part index or None if name DNE
+        #~ if index != None:
+            #~ return self.subFrames[ index ].get_Pose( frame ) # Get the part pose in the specified frame
+        #~ else:
+            #~ return None # The part name was not found , return None
+            
+    #~ def copy_parts( self ):
+        #~ """ Return copies of all the parts of the design in order to use them for assembly """
+        #~ partList = []
+        #~ for part in self.subFrames:
+            #~ temp = part.get_copy()
+            #~ temp.collActive = True # serving part to the simulation, collide
+            #~ partList.append( temp )
+        #~ return partList
+        
+    #~ def part_refs_list( self ):
+        #~ """ Return a list of references to the Design non-colliding parts """
+        #~ return self.subFrames[:] # Return a shallow copy of the subframes list
+             
+    #~ def get_copy( self , doCollide = False , preserveActive = False ):
+        #~ """ Get a copy of this Design with optionally colliding parts """
+        #~ partList = []
+        #~ for part in self.subFrames:
+            #~ temp = part.get_copy()
+            #~ if preserveActive: # If we are preserving active flag across copies , ignore 'doCollide'
+                #~ temp.collActive = part.collActive
+            #~ else: # If we are not preserving active flag across copies , assign all parts 'doCollide'
+                #~ temp.collActive = doCollide 
+            #~ partList.append( temp )
+        #~ rtnDesign = Design( self.position , self.orientation._theta , *partList )
+        #~ rtnDesign.name = self.name
+        #~ return rtnDesign
+    
+    #~ def sub_Design_from_parts_list( self , partNames , doCollide = False ):
+        #~ """ Return a Design object composes of only 'partNames' in their speicified relative positions """
+        #~ subList = []
+        #~ for name in partNames:
+            #~ temp = self.get_part_by_name( name ).get_copy() # This will throw an error if the part name does not exist in the design!
+            #~ temp.collActive = doCollide
+            #~ subList.append( temp )
+        #~ return Design( self.position , self.orientation._theta , *subList )
+            
+    #~ def label_parts_enclosed( self ):
+        #~ """ Iterate through all the parts and label them enclosed or not """
+        #~ # allParts = self.part_refs_list()
+        #~ for part in self.subFrames:
+            #~ # part.enclosed = part.is_trapped_simple_lab( allParts )
+            #~ part.enclosed = part.is_trapped_simple_lab( self.subFrames ) 
+            
+    #~ def has_trapped_inactive( self ):
+        #~ """ Return true if one of the inactive parts is trapped , use this to cache trappedness of unbuilt parts """
+        #~ for part in self.subFrames:
+            #~ if ( not part.collActive ) and part.enclosed:
+                #~ return True
+        #~ return False
+            
+    #~ def label_parts_free( self ):
+        #~ """ Iterate through all the parts and assess the freeness of each """
+        #~ # allParts = self.part_refs_list()
+        #~ for part in self.subFrames:
+            #~ # part.freeness = part.freeness_simple_lab( allParts )
+            #~ part.freeness = part.freeness_simple_lab( self.subFrames )
+            
+    #~ def set_parts_colliding( self , active = True ):
+        #~ """ Set all the parts to be collidable, the entire design is part of the simulation """
+        #~ for frame in self.subFrames:
+            #~ frame.set_colliding( active )
+            
+    #~ def set_active_by_name( self , pName , active = True ):
+        #~ """ Search for 'pName' and set the associated part 'active' """
+        #~ self.get_part_by_name( pName ).set_colliding( active )
+        
+    #~ def set_active_by_list( self , namesList , active = True ):
+        #~ """ Set the 'active' state of each name in namesList """
+        #~ for pName in namesList:
+            #~ self.get_part_by_name( pName ).set_colliding( active )
+            
+    #~ def set_active_by_list_exclusive( self , namesList , active = True ):
+        #~ """ Set the 'active' state of each name in namesList , and set all other names to the opposite state """
+        #~ for pName in self.get_all_part_names():
+            #~ if pName in namesList: # Name is on the list , set to the desired state
+                #~ self.get_part_by_name( pName ).set_colliding( active )
+            #~ else: # else name is not on the list , set to opposite of the desired state
+                #~ self.get_part_by_name( pName ).set_colliding( not active )
+                
+    #~ def bbox_active_only( self , frame = "lab" , active = True ):
+        #~ """ Return the bounding box of all the Design members that are 'active' """
+        #~ appPts = []
+        #~ for frame in self.subFrames:
+            #~ if frame.collActive == active:
+                #~ appPts.extend( frame.get_points( frame ) )
+            
+    #~ def putdowns_from_part_list( self , partsList ):
+        #~ """ Generate the putdown poses of an imaginal version of the design in which only 'partsList' is active """
+        #~ temp = self.get_copy() # Gen a scratch copy
+        #~ temp.set_active_by_list_exclusive( partsList ) # Activate the parts we are interested in and only those parts
+        #~ temp.transform_contents() # Make sure everything is in the proper spot
+        #~ temp.set_supports_for_hull( activeOnly = True ) # Calc the supports
+        #~ return temp.hullPutdowns[:] # Return a copy of the hull putdowns
+        
+    #~ def extent_scale( self , activeOnly = True ):
+        #~ """ Return the diagononal of the bounding box of the relative points in order to offer a sense of scale """
+        #~ return vec_dif_mag( *bbox_from_points( list( self.vertex_set_rel( activeOnly = activeOnly ) ) ) )
+        
+    #~ def count_active_parts( self , active = True ):
+        #~ """ Return the number of subFrames that have their flag set to 'active' """
+        #~ count = 0
+        #~ for frame in self.subFrames:
+            #~ if frame.collActive == active:
+                #~ count += 1
+        #~ return count
+        
+#~ # == End Design ==
+
+
+#~ # == Stability and Placement ==
+
+#~ def planar_poly_stability( vertices , centroid ):
+    #~ """ Return a stability measure for each side of a closed polygon by projecting the 'centroid' onto each in turn """
+    #~ # NOTE: This function does not check for the feasibility of resting on a side and assumes that the 'vertices' define a convex polygon
+    #~ # NOTE: Stability listed according to the order of 'vertices' , a side is '[ vertices[i] , vertices[i+1] ]'
+    #~ sideStability = []
+    #~ for vDex in xrange( len( vertices ) ):
+        #~ sideStability.append( proj_pnt_within_seg( centroid , [ elemw( vertices , vDex ) , elemw( vertices , vDex + 1 ) ] ) )
+    #~ return sideStability
+    
+#~ class Table(Poly2D):
+    #~ """ Object representing a broad, flat surface on which parts and assemblies will be set """
+    
+    #~ def __init__( self ,  ):
+        #~ """ Create a thin rectangle with the center of the table at the origin , parts will not occupy negative y coords """
+        #~ Poly2D.__init__( self , [ 0 , 0 ] , 0 , 
+                                #~ [ -1000 , -1000 ] , [  1000 , -1000 ]  , [  1000 ,   0 ] ,  [ -1000 ,   0 ] )
+        #~ self.name = "Table"
+
+#~ def support_to_Pose( supportSeg ):
+    #~ """ Given a supporting segment in the frame of the object to put down, return a Pose2D that placed the center of the support at [0,0] , within +y """
+    #~ midpoint = vec_avg( *supportSeg ) #; print "midpoint" , midpoint
+    #~ angle = ray_angle( supportSeg ) #; print "angle" , angle
+    #~ return Pose2D( np.multiply( Turn( -angle ).apply_to( midpoint ) , -1 ) , -angle )
+    #~ #      Pose2D( np.multiply( Turn( -angle ).apply_to( midpoint ) , -1 ) , -angle )
+    
+#~ def parts_from_structures( structList , polyList = [] ):
+    #~ """ Return a list of Poly2D references given a list of frames that may or may not be nested """
+    #~ for struct in structList: # For each of the structures in the list
+        #~ if hasattr( struct , "points" ):
+            #~ polyList.append( struct )
+        #~ parts_from_structures( struct.subFrames , polyList )
+    #~ return polyList
+
+#~ # == End Stability ==
+
+# ___ END SPARE ____________________________________________________________________________________________________________________________
