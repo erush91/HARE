@@ -51,7 +51,7 @@ bool assign_param_or_default( ros::NodeHandle& nh , string paramName , T& paramV
     }
 }
 
-size_t rowmajor_flat_index( size_t cols , size_t i , size_t j ); // Return the array index of a flattened 2D array
+inline size_t rowmajor_flat_index( size_t cols , size_t i , size_t j ){  return cols * i + j;  } // Return the array index of a flattened 2D array
 
 // ___ End Func ____________________________________________________________________________________________________________________________
 

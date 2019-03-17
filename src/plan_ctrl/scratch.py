@@ -11,6 +11,6 @@ def even_index_bounds( total , divisions ):
         rtnBounds.append( total )
     return rtnBounds
 
-bounds = even_index_bounds( 699 , 100 )
+bounds = even_index_bounds( 720 , 100 )
 print bounds
 print len( bounds )
