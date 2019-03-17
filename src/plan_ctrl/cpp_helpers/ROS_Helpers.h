@@ -33,6 +33,8 @@ enum LogLevel{ INFO , WARN , ERROR };
 
 void ros_log( string msg , LogLevel level );
 
+string to_string( std::__cxx11::basic_string<char>& inStr );
+
 template<typename T>
 bool assign_param_or_default( ros::NodeHandle& nh , string paramName , T& paramVar , const T& defaultVal ){
     string msg;
@@ -48,6 +50,8 @@ bool assign_param_or_default( ros::NodeHandle& nh , string paramName , T& paramV
         return false;
     }
 }
+
+size_t rowmajor_flat_index( size_t cols , size_t i , size_t j ); // Return the array index of a flattened 2D array
 
 // ___ End Func ____________________________________________________________________________________________________________________________
 

@@ -43,6 +43,11 @@ void ros_log( string msg , LogLevel level ){
   }
 }
 
+string to_string( std::__cxx11::basic_string<char>& inStr ){  return string( inStr );  }
+
+size_t rowmajor_flat_index( size_t cols , size_t i , size_t j ){  return cols * i + j;  } // Return the array index of a flattened 2D array
+    
+
 // ___ End Func ____________________________________________________________________________________________________________________________
 
 

@@ -4,6 +4,9 @@
 numpoints: 100
 scanlines:   3
 scan_rows: [ 380 , 430 , 480 ]
+imagewdth: 1280
+imagehght:  720
 
 # ~~ Node Config ~~
 publ_rate: 30
+imagtopic: /camera/depth/image_rect_raw
