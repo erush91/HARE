@@ -355,6 +355,19 @@ ostream& operator<<( ostream& os , const std::vector<T>& vec ) { // ostream '<<'
     return os; // You must return a reference to the stream!
 }
 
+
+template<typename T> // NOTE: Templated functions must have their definition in the header file
+string to_string( const std::vector<T>& vec ) { 
+    // Convert the vector to a string
+    string rtnStr = "[ ";
+    for( size_t i = 0 ; i < vec.size() ; i++ ){
+        rtnStr += vec[i];
+        if( i+1 < vec.size() ){  rtnStr += ", ";  }
+    }
+    rtnStr += " ]";
+    return rtnStr; 
+}
+
 template<typename T> // NOTE: Templated functions must have their definition in the header file
 ostream& operator<<( ostream& os , const std::vector<std::vector<T>>& vecVec ) { // ostream '<<' operator for vectors
     // NOTE: This function assumes that the ostream '<<' operator for T has already been defined

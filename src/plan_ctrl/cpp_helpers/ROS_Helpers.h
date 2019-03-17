@@ -33,6 +33,22 @@ enum LogLevel{ INFO , WARN , ERROR };
 
 void ros_log( string msg , LogLevel level );
 
+template<typename T>
+bool assign_param_or_default( ros::NodeHandle& nh , string paramName , T& paramVar , const T& defaultVal ){
+    string msg;
+    if ( nh.getParam( paramName , paramVar ) ){
+        T val = paramVar;
+        msg = "Got param '" + paramName + "' with value " + to_string( val );
+        ROS_INFO( "%s" , msg.c_str() );
+        return true;
+    }else{
+        msg = ( "Failed to get param '" + string( paramName ) + "'" );
+        ROS_ERROR( "%s" , msg.c_str() );
+        paramVar = defaultVal;
+        return false;
+    }
+}
+
 // ___ End Func ____________________________________________________________________________________________________________________________
 
 

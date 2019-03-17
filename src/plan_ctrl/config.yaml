@@ -1,0 +1,9 @@
+# Config file for turning a depthimage into an array
+
+# ~~ Filter Config ~~
+numpoints: 100
+scanlines:   3
+scan_rows: [ 380 , 430 , 480 ]
+
+# ~~ Node Config ~~
+publ_rate: 30
