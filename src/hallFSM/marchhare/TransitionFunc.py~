@@ -1,0 +1,1577 @@
+#/usr/bin/env python
+# -*- coding: utf-8 -*-
+from __future__ import division
+# ~~ Future First ~~
+
+"""
+TransitionFunc.py , Built on Wing IDE 101 for Python 2.7
+James Watson, 2017 February
+Transition function for graph searches , This is a temporary file that will need to be merged with the larger graph search code at a later date
+"""
+
+
+#from AsmEnv import *
+import sys, os.path, itertools, time
+SOURCEDIR = os.path.dirname( os.path.abspath(__file__) )
+ENVDIR = os.path.join( os.path.dirname( SOURCEDIR ) , 'AsmEnv' )
+sys.path.append( os.path.join( os.path.dirname( SOURCEDIR ) , 'AsmEnv' , 'VectorMath' ) )
+
+if ENVDIR in sys.path:
+    print 'Already in sys.path:', ENVDIR
+else:
+    sys.path.append( ENVDIR )
+    print 'Loaded:', str( ENVDIR )
+
+from AsmEnv import *
+from Vector import vec_dif_mag
+from Vector2D import *
+from DesignSpec import *
+from PolyWorldApp import *
+from Graph import *
+import numpy as np
+
+# 'are_parallel' , 'line_norm_distance' , and 'point_in_line_point' moved to "VectorMath/Vector2D.py"
+
+def quick_test(pl, al, a=0.):
+    """
+    (pl, al, a=0)
+    pl: part line - list of tuples [ (x, y), (x, y) ]
+    al: antagonist part line - list of tuples [ (x, y), (x, y) ]
+    a: float 0.0
+
+    Tests if lines are parallel, distance between lines are less than the 'a' value
+    and if lines coincide.
+    If all tests check, Returns TRUE
+    """
+    p1 = pl[0]
+    p2 = pl[1]
+    p3 = al[0]
+    p4 = al[1]
+    if are_parallel(p1, p2, p3, p4):
+        if line_norm_distance(p1, p2, p3, p4, e=a):
+            if point_in_line_point(p1, p2, p3, p4):
+                return True
+    return False
+
+class GeoAttributes:
+    """
+    Class used to store the geometry of the assembly template and call physical
+    properties of the assembly parts
+    """
+    def __init__( self, part, points ):
+        '''
+        Fill in stuff
+        '''
+        self.part = part
+        self.points = points
+        self.base_points = None
+        if not isinstance(part, list):
+            self.part_points = self.get_points_by_name( self.part, self.points )
+            self.area = self.get_area_centroid( self.part )
+            self.centroid = self.get_area_centroid( self.part_points, centroid=True )
+        else:
+            a = 0
+            c = np.array([0., 0.])
+            for p in self.part:
+                self.part_points = self.get_points_by_name( p )
+                self.get_area_centroid( p )
+                a += self.area
+                c += self.centroid * self.area
+            self.area = a
+            self.centroid = c / self.area
+
+    def get_area_centroid( self, part ):
+        """
+        ( part )
+        part: string of part name
+
+        self.centroid becomes the (x, y) values defining the centroid of the part
+
+        Works only if parts' verticies are ordered. Does not matter if CW or CCW
+        """
+        x = []
+        y = []
+        points = self.get_points_by_name( part )
+        for vertex in points:           # Organize verticies in x and y lists.
+            x.append( vertex[0] )
+            y.append( vertex[1] )
+        self.area = 0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1)))
+        cx = 0
+        cy = 0
+        for i in range( len( x ) ):
+            cx += (x[i] + elemw(i+1, x)) * (x[i] * elemw(i+1, y) - elemw(i+1, x) * y[i])
+            cy += (y[i] + elemw(i+1, y)) * (x[i] * elemw(i+1, y) - elemw(i+1, x) * y[i])
+        self.centroid = np.array( [ cx / (6 * self.area), cy / (6 * self.area ) ] )
+
+        # Possible to reduce for loops into one         FUTURE 
+
+    def get_points_by_name( self, part ):
+        """
+        ( part )
+        part: string of part name
+
+        returns verticies (x, y) of all points in the listed part
+        """
+        for i in self.points:
+            if part in i:
+                return i[1]
+
+    def torque( self, f_part, b_part ):
+        """
+        ( f_part, b_part )
+        f_part: fetch part - string of part name
+        b_part: built part/s (base/root parts) - string or list of strings of part name/s
+
+        Computes cost of the fetch part onto the b_part or current built assembly.
+        The distance from the base points ( the lowest y values from the assembly verticies)
+        and the new centroid is the cost to place part f_part.
+        """
+
+
+        # Search all points to find the lowest y values in the verticies, 'base points'
+        if not isinstance( b_part, list ):      
+            b_points = self.get_points_by_name( b_part )
+            y_min = min( b_points, key = lambda t: t[1] ) [1]
+            part_list = [b_part, f_part]
+        else:
+            b_points = []
+            for part in b_part:
+                b_points += self.get_points_by_name( part ) 
+            y_min = min( b_points, key = lambda t: t[1] ) [1]
+            part_list = b_part + [f_part]
+
+        # Search for verticies with the y_min in y then sorts
+        self.base_points= []
+        for point in b_points:
+            if point[1] == y_min:
+                self.base_points.append( point )
+        self.base_points = sorted( self.base_points, key=lambda x: x[0] )
+
+        # Create recursive class with updated parts list
+        geo = GeoAttributes( part_list, self.points )
+        if geo.centroid[0] < self.base_points[0] [0]:
+            #print geo.centroid[0], 'is NOT inbetween', self.base_points[0] [0], self.base_points[-1][0]
+            return abs( self.area * (self.centroid[0] - self.base_points[0] [0] ) )
+        elif geo.centroid[0] > self.base_points[-1][0]:
+            #print geo.centroid[0], 'is NOT inbetween', self.base_points[0] [0], self.base_points[-1][0]
+            return abs( self.area * (self.centroid[0] - self.base_points[-1] [0] ) )
+        else:
+            #print geo.centroid[0], 'is inbetween', self.base_points[0] [0], self.base_points[-1][0]
+            #print ' that test passed'
+            return 0
+
+class SearchNode:
+    def __init__(self, s, parent=None, parent_action=None, cost=0):
+        '''
+        s - the state defining the search node
+        A - list of actions
+        parent - the parent search node
+        parent_action - the action taken from parent to get to s
+        '''
+        self.parent = parent
+        self.cost = cost
+        self.parent_action = parent_action
+        self.state = s
+
+    def __str__(self):
+        '''
+        Return a human readable description of the node
+        '''
+        return str(self.state) + ' ' + str(self.actions)+' '+str(self.parent)+' '+str(self.parent_action)
+
+# == class graph_class ==
+# Updated: 2017-02-04
+
+class graph_class:
+    '''
+    ( assembly_path, orrientation )
+    assembly_path: string directory to the design template
+    orientation: float - angle at which the assembly is oriented
+
+    Class to store the build graph for navigation. Reads in assembly.txt.
+    Returns plan with lowest torsional cost
+
+    currently awesome, PLEASE USE
+
+    '''
+    def __init__(self, assembly_path=None, designSpec=None, orrientation=0):
+        
+        self.s_time = time.clock()
+        self.parse_time = None
+        self.graph_time = None
+        self.plan_time = None
+        self.cost_s_time = None
+        self.cost_e_time = None
+        self.e_time = None
+
+        self.cost = 0
+        self.graph_list = None
+        self.parts = None
+        self.points = None
+        self.init = None
+        self.actions = None
+        self.ori = orrientation
+        self.visited = None
+        self.priority_list = None
+        self.design_parts = None
+        self.gc_list = TaggedLookup() # able to .get_by_als(part name)
+        self.edges = []
+
+        self.designSpec = None
+        if assembly_path is not None:
+            self.read_assembly( path=assembly_path )
+            self.origin_list = self.parts[:]
+        if designSpec is not None:
+            self.read_assembly( ds=designSpec )
+
+
+    def read_assembly(self, path=None, ds=None):
+        """
+        ( path )
+        path: string directory to the design template
+
+        reads and parses the design using parse_Design_from_txt class from James' DesignSpec.py
+        """
+        self.parts = []
+        self.points = []
+        if path is not None:
+            self.designSpec = parse_Design_from_txt( path )
+        if ds is not None:
+            self.designSpec = ds
+        if self.ori == 0:
+            self.designSpec.transform_contents()
+            parts = self.designSpec.subFrames
+            for part in parts:
+                self.parts.append( part.name )
+                self.points.append( [part.name, self.designSpec.get_part_by_name(part.name).labPts] )
+        self.parse_time = time.clock()
+        self.build_graph( self.points )
+
+    def compile_time( self ):
+        """
+        No Imput Required
+
+        Used to print local timing of the BuildOrder.py
+        """
+        print '\n----------------------\n'
+        print 'with # of parts = ', len(self.parts)
+        print 'parsing time = ', self.parse_time - self.s_time 
+        print 'graph build time = ', self.graph_time - self.parse_time
+        print 'planning time = ', self.plan_time - self.graph_time
+        print 'cost planning time = ', self.cost_e_time - self.cost_s_time
+        print 'total time = ', self.cost_e_time - self.s_time
+
+
+    def graph_timer( self ):
+        """
+        No Imput Required
+
+        Used to return the graph build function timing
+        """
+        return  self.graph_time - self.parse_time
+
+    def priority( self, part ):
+        """
+        ( part )
+        part: string - part name to be prioritized
+
+        Adds a part to the priority list
+        """
+        self.priority_list.append( part )
+
+    def transition( self,  part, a, cost=None ):
+        """
+        ( part, a, cost=None )
+        part: string - of part name
+        a: integer - action index of adjacent parts
+        cost: float cost to apply part
+
+        transition function used to add a state to the frontier
+        """
+        for p in self.graph_list:
+            if part in p:
+                return p[1][a]
+        return None
+    
+    def get_actions( self, part ):
+        """
+        ( part )
+        part: string - of part name
+
+        Returns a range of integers of adjacent parts
+        """
+        for p in self.graph_list:
+            if part in p[0]:
+                self.actions = range( len( p[1] ) )
+
+    def get_geo_att( self, part, points):
+        """
+        ( part, points )
+        I forgot what this does                         FUTURE
+        """
+        geo = GeoAttributes( part, points )
+
+    def get_points_by_name( self, part ):
+        """
+        ( part )
+        part: string - of part name
+
+        Returns all the verticies (x, y) of the associated part
+        """
+        for i in self.points:
+            if part in i:
+                return i[1]
+
+    def build_graph(self, part_list):
+        """
+        ( part_list )
+        part_list: list of strings - names of all parts associated with the assembly
+
+        creates an adjacency graph using the line check functions from above
+        self.graph_list is a list in the format
+        [ [partA, [partB, partC]], [partB, [partA]]... ]
+        """
+        self.graph_list = []
+        graph_part = ''
+        b = 0
+        i = 0
+        for part in part_list:
+            self.gc_list.append( Node( pGraph=self, alias=part[0] ) )
+
+        # Long extended for loop in order part > other parts > lines from part > lines from other parts
+        for partdex, part in enumerate(part_list):
+            self.graph_list.append( [ part[0], None ] )
+            
+            #print part[0]
+            part_extend = []
+            for m in range(partdex + 1, len(part_list)):
+                b = 0
+                #print '\t', part_list[m][0]
+                for p_num in range(len(part[1])):
+                    if b == 1:
+                        break
+                    pline = [part[1][p_num], elemw(p_num + 1, part[1])]
+                    #print 'pline', pline
+                    for ant_num in range(len(part_list[m][1])):
+                        antline = [part_list[m][1][ant_num], elemw(ant_num + 1, part_list[m][1])]
+                        #print 'andtline', antline
+        
+                        if quick_test(pline, antline, a=0):
+                            #print '\n\n\t\t\t TRUE', part_list[m][0], '\n\n'
+                            self.gc_list.get_by_als( part[0] ).connect_to( self.gc_list.get_by_als( part_list[m][0] ) ) 
+                            self.edges.append( sort_tuple( ( part[0], part_list[m][0] ) ) )
+                            part_extend.append(part_list[m][0])
+                            b = 1
+                            break
+            #self.gc_list
+            self.graph_list[i][1] = part_extend
+
+            i += 1
+        # graph fix, m
+        for partdex, part in enumerate(self.graph_list):
+            for i in [x for x in xrange(len(self.graph_list)) if x != partdex]:
+                #print self.graph_list[i][1]
+                if part[0] in self.graph_list[i][1]:
+                    self.graph_list[partdex][1].append(self.graph_list[i][0])
+
+        self.graph_time = time.clock()
+
+    def call_sub_design():
+        # line 1374 Vector 2D
+        pass
+        
+    def is_trapped( self, designSpec, part ):
+        designSpec.label_parts_enclosed()
+        self.allParts = designSpec.part_refs_list()
+
+        for p in self.allParts:
+            if part == p.name:
+                return p.enclosed
+
+# == End graph_class ==
+        
+class sub_planner:
+
+    """
+    -detection of end nodes whose label is enclosed
+    -graph grouping of sub assemblies
+    -treating sub assemblies as parts of final assembly
+    """
+
+    def __init__( self, g ):
+        self.g = g
+        self.init_nodes = []
+        self.sub_graph = []
+        self.sub_design = None
+        #print g.parts
+
+        self.end_nodes( self.g )
+        self.graph_split( self.g, self.init_nodes )
+
+    def end_nodes( self, g ):
+        """
+        This finds all end nodes
+        """
+        for part in g.parts:
+            g.get_actions( part )
+            if len( g.actions ) == 1:
+                if g.is_trapped( g.designSpec, part ):
+                    self.init_nodes.append(part)
+
+    def graph_split( self, g, init_nodes ):
+        """
+        A simple BFS Graph search for an assembly/sub assembly
+        used to find and split a graph into sub graphs for sub assemblys
+        """
+        while len( init_nodes ) > 0: 
+            s0 = init_nodes.pop()
+            frontier = []
+            visited = []
+            frontier.append( s0 )
+            visited.append( s0 )
+            i=0
+
+            while len(frontier) > 0:
+                i += 1
+                state = frontier.pop(0)
+
+                g.get_actions( state )
+                for a in g.actions:
+                    s_p = g.transition(state, a)
+                    if s_p not in visited:
+                        if g.is_trapped( g.designSpec, s_p ):
+                            frontier.append(s_p)
+                            visited.append(s_p)
+                            if s_p in init_nodes:
+                                init_nodes.remove(s_p)
+            if len( visited ) < 2:
+                g.get_actions( s0 )
+                for a in g.actions:
+                    s_p = g.transition( s0, a)
+                    visited.append(s_p)
+            
+                self.sub_graph.append( visited )
+            else:
+                nds = g.designSpec.sub_Design_from_parts_list( visited )
+                ng = graph_class(None, designSpec=nds )
+                s = sub_planner( ng )
+                if s.sub_graph:
+                    self.sub_graph.append(s.sub_graph)
+
+# == Assembly Graph Transitions ==
+
+class AsmState(object):
+    """ Represents the state of an assembly in progress , this class does not enforce any design-specific constraints """
+    
+    def __init__( self , pPlaced = [] , pUnplaced = [] , pSatisfied = [] , pUnsat = [] , pSubs = {} ):
+        """ All members start as empty sets """
+        self.placed = set( pPlaced ) # ----- Set of placed part names        
+        self.unplaced = set( pUnplaced ) # - Set of unplaced part names
+        self.satisfied = set( pSatisfied ) # Set of satisfied adjacencies
+        self.unsat = set( pUnsat ) # ------- Set of unsatisfied adjacencies
+        self.subAsm = pSubs.copy() # ------- Dictionary representing what subassembly each of the placed parts belongs to
+        self.numSubs = len( self.subAsm ) #  Number of active sub-assemblies
+        # For now , we will assume that sub-assemblies are assigned by transitions , and not try to infer sub-assemblies from chains of 
+        #satisfied edges
+        self.design = None
+        
+    def serialize( self ):
+        """ Return the assembly state as a compound data structure that does not rely on references """
+        return ( tuple( self.placed ) , tuple( self.unplaced ) , tuple( self.satisfied ) , tuple( self.unsat ) , tuple( self.subAsm.items() ) )  
+        
+    @staticmethod
+    def deserialize( self , tupleTuples ):
+        """ Turn a tuple of tuples into an 'AsmState' """
+        return AsmState(
+            pPlaced = tupleTuples[0] , 
+            pUnplaced = tupleTuples[1] , 
+            pSatisfied = tupleTuples[2] , 
+            pUnsat = tupleTuples[3] , 
+            pSubs = dict(tupleTuples[4])
+        )
+        
+    def get_copy( self ):
+        """ Return a copy of this assembly state """
+        return AsmState(
+            pPlaced = set( self.placed ) , 
+            pUnplaced = set( self.unplaced ) , 
+            pSatisfied = set( self.satisfied ) , 
+            pUnsat = set( self.unsat ) , 
+            pSubs = self.subAsm.copy()
+        )
+    
+    def __str__( self ):
+        """ Return a string representing the state of placements and satisfied adjacencies """
+        rtnStr = ""
+        rtnStr += "Placed:    " + str( self.placed ) + endl
+        rtnStr += "Unplaced:  " + str( self.unplaced ) + endl
+        rtnStr += "Satisfied: " + str( self.satisfied ) + endl
+        rtnStr += "Unsat.:    " + str( self.unsat ) + endl
+        rtnStr += "Sub Asm's: " + str( self.subAsm )
+        return rtnStr
+        
+    def is_valid( self , verbose = False ):
+        """ Check that neither the un/placed nor the un/satisfied sets overlap """
+        if len( self.placed.intersection( self.unplaced ) ) > 0:
+            if verbose:
+                "INVALID , parts shared between placed and unplaced:" , self.placed.intersection( self.unplaced )
+            return False
+        if len( self.satisfied.intersection( self.unsat ) ) > 0:
+            if verbose:
+                "INVALID , edges shared between satisfied and unsat:" , self.satisfied.intersection( self.unsat )
+            return False
+        return True
+        
+    def eq( self , otherState ):
+        """ Return True if 'self' and 'otherState' are equivalent assembly states , otherwise return False """
+        # 'op1' and 'op2' are equivalent if their placed , unplaced , satisfied , and unsat sets are identical # Redundant to look at number of subs
+        if len( self.placed.symmetric_difference( otherState.placed ) ) > 0:
+            # print "DEBUG , placed was different" , op1.placed.symmetric_difference( op2.placed )
+            return False
+        if len( self.unplaced.symmetric_difference( otherState.unplaced ) ) > 0:
+            # print "DEBUG , unplaced was different" , op1.unplaced.symmetric_difference( op2.unplaced )
+            return False
+        if len( self.satisfied.symmetric_difference( otherState.satisfied ) ) > 0:
+            # print "DEBUG , satisfied was different" , op1.satisfied.symmetric_difference( op2.satisfied )
+            return False
+        if len( self.unsat.symmetric_difference( otherState.unsat ) ) > 0:
+            # print "DEBUG , unsat was different" , op1.unsat.symmetric_difference( op2.unsat )
+            return False
+        return True
+
+class AsmStateOrientable(AsmState):
+    """ Represents the state of an assembly in progress with orientations , this class does not enforce any design-specific constraints """
+    
+    def __init__( self , pPlaced = [] , pUnplaced = [] , pSatisfied = [] , pUnsat = [] , pSubs = {} , pSubStruct = [] ):
+        AsmState.__init__( self , pPlaced , pUnplaced , pSatisfied , pUnsat , pSubs ) # parent '__init__'
+        self.subStruct = pSubStruct
+        if len( pSubs ) > 0 and len( pSubStruct ) == 0:
+            print "DEBUG , Attempting to create the subStruct"
+            self.populate_sub_struct( self.design ) # If 'self.design' is still None , then all of the orientation structs will be empty
+        
+    def populate_sub_struct( self , designModel = None ):
+        """ Populate the list that describes all the in-progress subs with the form , these are at the same indices
+            { ( NAME_TUPLE_SORTED ) : { "orientation":int , "totalOrnt":int , "design": Desgin } } """
+        self.subStruct = [ [ [] , 0 , 1 , None ] for i in xrange( max( self.subAsm.values() ) + 1 ) ] # Reset the sub structure
+        # 1. Reverse lookup , name:number --> number:name
+        if 0:
+            for pName , subN in self.subAsm.iteritems(): # for each of the name:number pairs
+                self.subStruct[ subN ][ 0 ].append( pName ) # Append the name to the sub list corresponding to the sub number index
+        # 2. Determine how many orientations there are if there is a Design
+        # if isinstance( designModel , 'Design' ): # If there is a design , then use it to generate possible poses
+        if isinstance( designModel , Design ): # If there is a design , then use it to generate possible poses
+            for sDex , subInfo in enumerate( self.subStruct ): # For each sub
+                subInfo[0] = sorted( subInfo[0] ) # Sort the part names of the sub
+                contents = subInfo[0] 
+                tempDes = designModel.get_copy( doCollide = False ) # get a non-colliding copy of the design
+                tempDes.set_parts_colliding( active = False )
+                for pName in contents: # Activate only the parts in this sub
+                    tempDes.set_active_by_name( pName , True )
+                tempDes.transform_contents()
+                tempDes.set_supports_for_hull( activeOnly = True )
+                self.subStruct[2] = len( tempDes.hullPutdowns ) # Get and store the total number of orientations possible
+                self.subStruct[3] = tempDes # Store the design with calc'd putdowns
+    
+    def check_placement( self , TModel , pName , orientation ):
+        """ Check that the new sub can be placed in the specified orientation if so , return True , Design , if not , return False , Design """
+        tempDes = TModel.fetch_design( tpl( pName ) )
+        if orientation < len( tempDes.hullPutdowns ):
+            return True  , tempDes
+        else:
+            return False , tempDes
+    
+    def flatten_sub_struct( self , getList = False ):
+        """ Return a tuplated version of 'self.subStruct' , 
+            with each sub tuple taking the form: ( ( NAMES_TUPLE ) , ORIENTATION , TOTAL_ORIENTATIONS ) """
+        rtnList = [] # This will be tuplated before returning
+        for sDex , subInfo in enumerate( self.subStruct ):
+            rtnList.append( ( tuple( subInfo[0] ) , subInfo[1] , subInfo[2] ) ) # omitting design 'subInfo[3]' # Sorting should be enforced by transitions
+        if getList:
+            return rtnList    
+        return tuple( rtnList )
+        
+    @staticmethod
+    def unflatten_sub_struct( tupleTuples ):
+        """ Return a dictionary that will return the orientation state of a sub """
+        rtnList = [ [ [] , 0 , 1 , None ] for i in xrange( len( tupleTuples ) ) ]
+        for tDex , subTpl in enumerate( tupleTuples ):
+            rtnList[ tDex ][ 0 ] = list( subTpl[ 0 ] )
+            rtnList[ tDex ][ 1 ] = subTpl[ 1 ]
+            rtnList[ tDex ][ 2 ] = subTpl[ 2 ]
+        return rtnList
+        
+    def serialize( self ):
+        """ Return the assembly state as a compound data structure that does not rely on references , this version is HASHABLE! """
+        return ( 
+            tuple( self.placed ) , # ------- Tuple of placed parts , easy to make set
+            tuple( self.unplaced ) , # ----- Tuple of unplaced parts , easy to make set 
+            tuple( self.satisfied ) , # ---- Tuple of satsified edges , easy to make set
+            tuple( self.unsat ) ,  # ------- Tuple of unsatisfied edges , easy to make set
+            # tuple( self.subAsm.items() ) , # Do not rely on this hash for valid state! # Tuple of ( NAME , SUB ) pairs , easy to hash to dict
+            self.flatten_sub_struct() # ---- Tuple representing the orientation state of all the subs
+        )
+        
+    def get_sub_struct_copy( self ):
+        """ Get a copy of the sub-struct """
+        rtnStruct = []
+        for sDex , subInfo in enumerate( self.subStruct ):
+            rtnStruct.append(
+                [
+                    subInfo[0][:],
+                    subInfo[1] , 
+                    subInfo[2] , 
+                    None
+                ]                        
+            )
+            if subInfo[3] != None:
+                rtnStruct[-1][3] = subInfo[3] # This should really be a reference to the same object , until we  decided to change it , 
+        return rtnStruct #                      in which case it will be a reference to a different object
+        
+    def get_copy( self ):
+        """ Return a copy of this assembly state """
+        # print "DEBUG , making a state copy" , ',' , self.placed , ',' , self.unplaced , ',' , self.satisfied , ',' , self.unsat , ',' , self.subAsm.copy() , ',' , self.get_sub_struct_copy()
+        temp = AsmStateOrientable(
+            pPlaced = set( self.placed ) , 
+            pUnplaced = set( self.unplaced ) , 
+            pSatisfied = set( self.satisfied ) , 
+            pUnsat = set( self.unsat ) , 
+            pSubs = {} ,# self.subAsm.copy() ,
+            pSubStruct = self.get_sub_struct_copy()
+        )
+        # print "DEBUG , about to return a AsmStateOrientable with struct" , temp.subStruct
+        return temp
+        
+    def __str__( self ):
+        """ Return a string representing the state of placements , satisfied adjacencies , and sub orientations """
+        rtnStr = AsmState.__str__( self ) + endl
+        rtnStr += str( self.flatten_sub_struct() )
+        return rtnStr
+        
+    def is_valid( self , verbose = False ):
+        if not AsmState.is_valid( self , verbose ): # Get parent class validity , w/ or w/o debug info
+            return False
+#        if ( len( self.subAsm ) > 0 ) and ( max( self.subAsm.values() ) + 1 != len( self.subStruct ) ): # 'subAsm' CANNOT be relied upon for state info
+#            if verbose:
+#                print "INVALID , Number of elements in self.subStruct does not reflect the max sub number"
+#            return False
+        for subInfo in self.subStruct:
+            if ( subInfo[1] + 1 > subInfo[2] ) or ( subInfo[1] < 0 ):
+                if verbose:
+                    print "INVALID , orientation is a bad index:" , subInfo[1] , "with max" , subInfo[2] - 1
+                return False
+        return True
+        
+    def orientation_list( self ):
+        """ Return a list of all the orientation numbers of all subs """
+        return [ subInfo[1] for subInfo in self.subStruct ]
+        
+    def sub_parts_list( self ):
+        """ Return a list of tuples , each listing the names of parts in the associated sub """
+        return [ sort_list_to_tuple( subInfo[0] ) for subInfo in self.subStruct ]
+        
+    def ordered_rep( self ): # Use this when you have to quickly compare states in large collections (sets) , or need to use a state as a dict key
+        """ Return a compound tuple that fully represents the state , has no references , always has the same order , and is HASHABLE! """
+        return ( 
+            sort_list_to_tuple( self.placed ) , # ------- Tuple of placed parts , easy to make set
+            sort_list_to_tuple( self.unplaced ) , # ----- Tuple of unplaced parts , easy to make set 
+            sort_list_to_tuple( self.satisfied ) , # ---- Tuple of satsified edges , easy to make set
+            sort_list_to_tuple( self.unsat ) ,  # ------- Tuple of unsatisfied edges , easy to make set
+            sort_list_to_tuple( self.flatten_sub_struct( getList = True ) ) # ---- Tuple representing the orientation state of all the subs
+        )
+        
+    def eq( self , otherState ):
+        """ Return True if 'self' and 'otherState' are equivalent assembly states , otherwise return False """
+        return self.ordered_rep() == otherState.ordered_rep()
+        
+    @staticmethod
+    def eq_states( op1 , op2 ):
+        """ Return True if 'op1' and 'op2' are equal , otherwise return False , For the case when you can't pass a member func """
+        return op1.eq( op2 )
+
+    # = Sub-assembly Attributes =
+        
+    def get_putdown_for_sub( self , subNum , index = None ): # Use 'index' to query other than current
+        """ Return the current putdown pose for the sub at 'subnum' , or the putdown at 'index' , if specified """
+#        if not hasattr( self.subStruct[ subNum ][3] , 'hullPutdowns' ): # This should have already been calculated
+#            self.subStruct[ subNum ][3].set_supports_for_hull()
+        if index == None:
+            # print "DEBUG , tried to get orientation for sub" , subNum , "out of" , len( self.subStruct ) , "total subs"
+            return self.subStruct[ subNum ][3].hullPutdowns[ self.subStruct[ subNum ][1] ]
+        else:
+            return self.subStruct[ subNum ][3].hullPutdowns[ index ] # This can cause an error if this the index DNE
+            
+    def get_stability_for_sub( self , subNum , index = None ): # Use 'index' to query other than current
+        """ Return the stability of the current pose for the sub at 'subnum' , or the stability of sub putdown 'index' , if specified """
+#        if not hasattr( self.subStruct[ subNum ][3] , 'hullPutdowns' ):  # This should have already been calculated
+#            self.subStruct[ subNum ][3].set_supports_for_hull()
+        if hasattr( self.subStruct[ subNum ][3] , 'stabilities' ):
+            if index == None:
+                # print "DEBUG , tried to get orientation for sub" , subNum , "out of" , len( self.subStruct ) , "total subs"
+                return self.subStruct[ subNum ][3].stabilities[ self.subStruct[ subNum ][1] ]
+            else:
+                return self.subStruct[ subNum ][3].stabilities[ index ] # This can cause an error if this the index DNE
+        else:
+            return None
+        
+    def get_seg_len_for_sub( self , subNum , index = None ): # Use 'index' to query other than current
+        """ Return the support length for current pose for the sub at 'subnum' , or the support length of sub putdown 'index' , if specified """
+#        if not hasattr( self.subStruct[ subNum ][3] , 'hullPutdowns' ):  # This should have already been calculated
+#            self.subStruct[ subNum ][3].set_supports_for_hull()
+        if index == None:
+            # print "DEBUG , tried to get orientation for sub" , subNum , "out of" , len( self.subStruct ) , "total subs"
+            return vec_dif_mag( *self.subStruct[ subNum ][3].supports[ self.subStruct[ subNum ][1] ] )
+        else:
+            return vec_dif_mag( *self.subStruct[ subNum ][3].supports[ index ] ) # This can cause an error if this the index DNE
+            
+    def get_mass_for_sub( self , subNum ):
+        """ Get the total mass (area) for the active parts in the sub """
+        return self.subStruct[ subNum ][3].area # This was calc'd at sub creation , retrieve
+        
+    def get_mass_for_Design( self ):
+        """ Get the total mass of the completed design , Assumes that there is at least one sub and all subs have the same Design """
+        if len( self.subStruct ) > 0: # If there is at least one sub
+            return self.subStruct[0][3].totalArea # Return the total area of all design parts , both active and inactive
+        else: # else there are no subs , state does not hold references to designs , return unity to prevent #/0 errors
+            return 1
+    
+    def get_least_stability( self ):
+        """ Return the least stability out of all of the subs in the state """ # Build a list of stabilities in the state and return the min, easy
+        stableList = [ self.get_stability_for_sub( i ) for i in xrange( len( self.subStruct ) ) ]
+        if len( stableList ) > 0:
+            return min( stableList ) # Negative stability is unstable , will return most usntable
+        else:
+            return infty
+        
+    def get_least_stability_measure( self ):
+        """ Return the least stability out of all of the subs in the state """ # Build a list of stabilities in the state and return the min, easy
+        stableList = [ self.get_stability_for_sub( i ) / self.get_seg_len_for_sub( i ) for i in xrange( len( self.subStruct ) ) ]
+        if len( stableList ) > 0:
+            return min( stableList ) # Negative stability is unstable , will return most usntable
+        else:
+            return infty
+        
+    def count_unstable_subs( self ):
+        """ Return the number of unstable subs in this state """
+        return len( [ i for i in xrange( len( self.subStruct ) ) if self.get_stability_for_sub( i ) < 0 ] ) # Create a list of unstable indices and return len
+    
+    # = End Attributes =
+            
+    def get_subStruct_index_by_part_name( self , partName ):
+        """ Search the 'subStruct' for 'partName' and return the index , otherwise return None of 'partName' DNE """
+        for sDex , struct in enumerate( self.subStruct ):
+            if partName in struct[0]: # If the part name is found in the manifest for this sub, return index of the sub
+                return sDex
+        return None # else searched the entire struct w/o success , return None
+        
+    def get_boat_dock_sub_indices( self , buildPair ):
+        """ Return the sub indices ( boatSub , dockSub ) corresponding to ( BOAT , DOCK ) """
+        return self.get_subStruct_index_by_part_name( buildPair[0] ) , self.get_subStruct_index_by_part_name( buildPair[1] )
+        
+    def calc_all_supports( self ):
+        """ Ensure that all the substruct Designs have the correct polygons activated and that the support info is correct """
+        for struct in self.subStruct:
+            dsgn = struct[3] # Fetch the design reference
+            dsgn.set_active_by_list_exclusive( struct[0] , active = True ) # Activate only the parts in the sub
+            dsgn.transform_contents() # Just in case
+            dsgn.set_supports_for_hull( activeOnly = True ) # Set the supports according to the parts present in the sub
+            struct[2] = len( dsgn.supports ) # Count the number of supports
+            struct[1] = struct[2] - 1 if struct[1] > struct[2] - 1 else struct[1] # Limit the orientation to a sensible number
+        
+    def count_blocked_parts_for_sub( self , TModel , subIndex ): # Erik: This is the Crystal Ball Function
+        """ Return the number of non-sub parts that are blocked for the sub at 'subIndex' in that sub's current orientation """
+        # NOTE: This function assumes that all the appropriate parts are active in the sub design and that supports are calc'd
+        # NOTE: This function assumes that the sub is set to a valid orientation
+        return TModel.fetch_blockage( tuple( self.subStruct[ subIndex ][0] ) , self.subStruct[ subIndex ][1] , 
+                                      design = self.subStruct[ subIndex ][3] ) # Fetch the design reference
+        
+    def count_blocked_parts_for_state( self , TModel ):
+        """ Return the total number of blocked build sites across the state """
+        totalBlocked = 0
+        for subIndex in xrange( len( self.subStruct ) ):
+            totalBlocked += self.count_blocked_parts_for_sub( TModel , subIndex )
+        return totalBlocked
+        
+    def count_trapped_parts_for_sub( self , TModel , subIndex ): # Erik: This is the Crystal Ball Function
+        """ Return the number of non-sub parts that are trapped for the sub at 'subIndex' in that sub's current orientation """
+        # NOTE: This function assumes that all the appropriate parts are active in the sub design and that supports are calc'd
+        # NOTE: This function assumes that the sub is set to a valid orientation
+        return TModel.fetch_trapness( tuple( self.subStruct[ subIndex ][0] ) , self.subStruct[ subIndex ][1] , 
+                                      design = self.subStruct[ subIndex ][3] ) # Fetch the design reference
+        
+    def count_trapped_parts_for_state( self , TModel ):
+        """ Return the total number of trapped build sites across the state """
+        totalBlocked = 0
+        for subIndex in xrange( len( self.subStruct ) ):
+            totalBlocked += self.count_trapped_parts_for_sub( TModel , subIndex )
+        return totalBlocked
+            
+    def resolve_edges_sat( self ):
+        """ Check if the 'satisfied' edges also satisfy any in 'unsat' and if so, automatically satisfy those edges """
+        subTuples = [ sub[0] for sub in self.subStruct ] # Create a list of all sub name groups
+        satPairs = []
+        for namePair in self.unsat: # For each of the presently unsatisfied edges
+            for subTpl in subTuples: # for each of the existing subs
+                if ( namePair[0] in subTpl ) and ( namePair[1] in subTpl ): # If there is a sub that already has both names it follows that
+                    satPairs.append( namePair ) #                             they are already in the correct relative position , satisfied!
+        for edge in satPairs:
+            self.unsat.remove( edge ) # Move the edge from unsat to satisfied # This would error if there were none to remove
+            self.satisfied.add( edge )
+        
+# = State Helpers =
+
+def find_state_in_list( s , stateList ):
+    """ If 's' exists in 'stateList' return the index of the first occurrence , otherwise return None """
+    for i , elem in enumerate( stateList ): # For each of the states in the list
+        if s.eq( elem ): # Checke for equality
+            return i # Return the index if equal
+    return None # Return None if iterated through list and nothing found
+
+# = End Helpers =
+    
+# = Transition Checks =
+
+def dummyCheck( TModel , s , a ): return True # Dummy build operation model , always returns true
+
+def TrappingActionCheck( TModel , s , a ):
+    """ Return True if performing the action does not trap any unbuilt parts """
+    # print "DEBUG , TrappingActionCheck , Got a model" , TModel
+    design = TModel.design
+    if a[0] == "place": # Place Action , Place the part all by itself in a new assembly
+        return True # There aren't any blockages for starting a new sub
+    elif a[0] == "build": # Build Action , simulate the design with the built parts
+        buildPair = a[1] # The two parts to bring together
+        if not ( ( buildPair[0] in s.placed ) or ( buildPair[1] in s.placed ) ): # If neither of the two parts have been placed , reject
+            return False
+        trialDesign = design.get_copy() # Get a copy of the design to modify
+        trialDesign.transform_contents()
+        trialDesign.set_parts_colliding( False ) # Set all the parts inactive
+        sub1 = s.subAsm[ buildPair[0] ] if ( buildPair[0] in s.subAsm ) else -1 #; print "DEBUG , sub1" , sub1
+        sub2 = s.subAsm[ buildPair[1] ] if ( buildPair[1] in s.subAsm ) else -1 #; print "DEBUG , sub2" , sub2      
+        #print "DEBUG , subAsm:" , s.subAsm
+        subNums = ( sub1 , sub2 ) # subs being brought together
+        # Activate all the parts that will either be built or will be brought into the assembly by a build action
+        unbuiltParts = []
+        for pName in design.get_all_part_names(): # For each of the parts
+            # if the part belongs to one of the sub-assemblies being brough together
+            if ( pName in buildPair ) or ( pName in s.subAsm and s.subAsm[ pName ] in subNums ): 
+                trialDesign.get_part_by_name( pName ).set_colliding( True ) # Activate the part for consideration
+            else: # else then the part is unbuilt and we will be checking if it is trapped 
+                unbuiltParts.append( pName )
+        print "DEBUG , unbuilt parts:" , unbuiltParts
+        # Check each of the remaining unbuilt parts to determine whether they will be trapped by this operation
+        allParts = trialDesign.part_refs_list() # Get a reference to all the parts , now that we have set them collidable
+        for unbuiltName in unbuiltParts: # For all of the unbuilt parts
+            if trialDesign.get_part_by_name( unbuiltName ).is_trapped_simple_lab( allParts , activeOnly = True ): # test whether unbuilt part is trapped
+                print "DEBUG , Trapped Part:" , unbuiltName
+                return False # If it is trapped , reject this action
+        return True # else the build action does not trap any unbuilt parts
+    else: # else the action was neither build nor place
+        raise ValueError( "TrappingActionCheck: " + str( a[0] ) + " is not a recognized action for this problem!" )
+
+# FIXME: TRAPPED BY THE FLOOR IS NOT THE SAME AS TRAPPED BY ASM
+
+def RotationActionCheck( TModel , s , a ): # WATCH OUT , This action check has a different signature than the blocking check
+    """ Return True if performing the action neither traps any unbuilt parts nor requests a bad roation """
+    if a[0] == "rotate": # Rotate actions take the form: ( 'rotate' , ( SUBASM_NUM , ORIENTATION_NUM ) )
+        try:
+            totalOrientCount = s.subStruct[ a[1][0] ][2] # This will throw an error if this sub DNE , which would indicate the action is not valid
+            if ( a[1][1] + 1 > totalOrientCount ) or ( a[1][1] < 0 ): # If the requested orientation is outside the allowed range for this sub , reject
+                return False
+            else: # else is within the allowed range accept , NOTE: This function does not check for a rotation that does not change the rotation state
+                return True
+        except Exception as ex: # requested a bad sub index , reject
+            return False
+    elif a[0] == "place": # Place Action , Place the part all by itself in a new assembly
+        return True # There aren't any blockages for starting a new sub
+        # TODO: Return False if a limit to total subs would be violated
+    elif a[0] == "build": # Build Action , simulate the design with the built parts
+        buildPair = a[1] # The two parts to bring together
+        boatName = buildPair[0]
+        dockName = buildPair[1]
+        
+        
+        
+        try:
+            if not ( dockName in s.placed ): # If the dock has not been placed , reject
+                return False
+            else: # Else the dock part belongs to an existing sub , get its index
+                dockSub = s.get_subStruct_index_by_part_name( dockName )
+                dockNames = list( s.subStruct[ dockSub ][0] )
+            if not ( boatName in s.placed ): # else if we are adding a new part to an existing sub
+                imaginal = [ boatName ] # imaginal list consists only of the part to be added
+            else: # else two subs are being joined
+                # Get all the part names of the boat sub and add to the imaginal list
+                boatSub = s.get_subStruct_index_by_part_name( boatName )
+                imaginal = list( s.subStruct[ boatSub ][0] ) # Make a copy of the list of names in the boat sub
+        except:
+            return False
+        
+        finalSortNames = sort_list_to_tuple( dockNames + imaginal ) # Get the ordered key for the sub design
+        
+        # Get a copy of the design
+        trialDesign = TModel.fetch_design( finalSortNames ) # This will automatically determine simple entrapment
+        
+        if trialDesign.has_trapped_inactive():
+            return False # If it is trapped , reject this action
+        
+        dockDesign = s.subStruct[ dockSub ][ 3 ] # Fetch the design of the dock sub
+        dockOrnttn = s.subStruct[ dockSub ][ 1 ] # Fetch the orientation index of the dock sub
+        
+        blockedSites = TModel.fetch_blocked_sites( tuple( dockNames ) , dockOrnttn , design = dockDesign )
+#        trappedSites = TModel.fetch_trapped_sites( tuple( dockNames ) , dockOrnttn , design = dockDesign )
+        
+        # Now check whether any in the imaginal list collides with the floor in their final positions
+        # print "There are" , len( imaginal ) , "parts to check:" , imaginal
+        for pName in imaginal:
+            if pName in blockedSites:
+                return False
+#            if pName in trappedSites: # THIS STILL CAUSES RAM EXPLOSION , DIAGNOSE WHY AT A LATER TIME
+#                return False
+            
+        return True # else the build action does not trap any unbuilt parts
+    else: # else the action was not in ( "rotate" , "place" , "build" ) , raise error
+        raise ValueError( "RotationActionCheck: " + str( a[0] ) + " is not a recognized action for this problem!" )
+
+# = End Checks =
+
+                 
+# = Exhaustive Transition Model , No Feasibility Considered =
+
+class AsmGraphTransition(object):
+    """ A class to model graph transitions for assembly planning """
+    
+    def __init__( self , templateDesign , opCheck = dummyCheck ):
+        """ Store the template design so that we can calculate transitsions  """
+        self.design = templateDesign.get_copy() # not used in this class
+        self.adjGraph = graph_class( designSpec = self.design )
+        self.op_check = opCheck
+        # self.geo_update = geoCheck
+    
+    def gen_init_state( self ):
+        """ Return a state that represents an assembly based on 'self.design' in which no placement and no build operations have been performed """
+        partSet = set( self.design.get_all_part_names() ) # None of the parts are placed at this point
+        edgeSet = set( self.adjGraph.edges )
+        # return AsmStateOrientable( pUnplaced = partSet , pUnsat = edgeSet )
+        return AsmState( pUnplaced = partSet , pUnsat = edgeSet )
+        
+    def transition( self , s , a ): 
+        """ Given state 's' and action 'a' ( ACTION , TARGET ) , return a valid next 's_prime' """
+        
+        # if self.op_check( self.design , s , a ): # If this is a valid transition
+        if self.op_check( self , s , a ): # If this is a valid transition
+        
+            s_prime = s.get_copy() # First , make a copy of the given state
+                        
+            if a[0] == "place": # Place Action , Place the part all by itself in a new assembly
+                pName = a[1] # Name of the part to place
+                if ( pName not in s.placed ) and ( pName in s.unplaced ): # If we have not placed this part before , then place it
+                    # Do not make changes to s_prime if 'pName' DNE in unplaced (DNE in asm)
+                    s_prime.unplaced.remove( pName ) # Remove the part from the unplaced set # This will throw an error if DNE
+                    s_prime.placed.add( pName ) # Put the part in the placed set
+                    s_prime.subAsm[ pName ] =  s_prime.numSubs # Assign this part to the new sub
+                    s_prime.numSubs += 1 # Increment the number of active subs                    
+                else: # else part is either unavailable to place or has already been placed , do nothing
+                    return s
+            elif a[0] == "build": # Build Action , 
+                buildPair = sort_tuple( a[1] ) # Tuple of two names to assemble , enforce alpha order
+                if ( ( buildPair[0] in s.placed ) or ( buildPair[1] in s.placed ) ): # If at least one in the pair has been placed
+                    if ( buildPair[0] in s.placed ) and ( buildPair[1] in s.placed ): # If BOTH in the pair have already been placed , join subs
+                        minAsm = min( s.subAsm[ buildPair[0] ] , s.subAsm[ buildPair[1] ] ) # We will consolidate to the two subs to the least number
+                        maxAsm = max( s.subAsm[ buildPair[0] ] , s.subAsm[ buildPair[1] ] ) # This sub will be consilidated out
+                        for key , val in s.subAsm.iteritems():
+                            if val == maxAsm: # If this item is the greater sub , consolidate # No change if subs identical
+                                s_prime.subAsm[ key ] = minAsm
+                        if minAsm != maxAsm: # If this is truly joining separate subs
+                            s_prime.numSubs -= 1 # Decrement the total number of subs
+                        # else just cleaning up a redundant connection between already-joined subs
+                        # Regardless of whether we consumed a sub-assembly , satisfy the edge
+                        satEdge = sort_tuple( buildPair ) # What if we didn't get the proper order?
+                        s_prime.unsat.remove( satEdge )
+                        s_prime.satisfied.add( satEdge )
+                    elif ( ( buildPair[0] in s.unplaced ) or ( buildPair[1] in s.unplaced ) ): # else only one has been placed , add it to an existing sub
+                        plcPart = buildPair[0] if buildPair[0] in s.placed else buildPair[1] # Find out which one has already been placed and store
+                        newPart = buildPair[0] if buildPair[0] not in s.placed else buildPair[1] # Find out which one has not been placed and store
+                        s_prime.unplaced.remove( newPart ) # Remove the part from the unplaced set # This will throw an error if DNE
+                        s_prime.placed.add( newPart ) # Put the part in the placed set
+                        s_prime.subAsm[ newPart ] = s.subAsm[ plcPart ]
+                        # Regardless of whether we consumed a sub-assembly , satisfy the edge
+                        satEdge = sort_tuple( buildPair ) # What if we didn't get the proper order?
+                        s_prime.unsat.remove( satEdge )
+                        s_prime.satisfied.add( satEdge )
+                    else: # else one of the parts DNE in unplaced , build does not make sense in this context
+                        # print "AsmGraphTransition.transition: One of" , buildPair , "was unavailable for building!"
+                        return s
+                else: # else neither has been placed , build does not make sense in this context
+                    # print "AsmGraphTransition.transition: Neither of" , buildPair , "was available for building!"
+                    return s
+                return s_prime # Return the new state
+            else:
+                raise ValueError( "AsmGraphTransition.transition: " + str( a[0] ) + " is not a recognized action for this problem!" )
+            return s_prime # If we made it here , then we have made some change to 's_prime' , return
+        else:
+            print "AsmGraphTransition.transition: Action" , a , "was rejected!"
+            return s # Transition is not valid , Return 's_prime' unchanged
+    
+    def get_actions( self , s ):
+        """ Attempt to get all possible actions 'a' available at 's' , no validity / success checks made """
+        rtnActions = []
+        # 1. Enumerate Placements
+        for stockPart in s.unplaced:
+            rtnActions.append( ( 'place' , stockPart ) ) # the specified check should happen automatically
+        # 2. Enumerate Builds
+        for unconnectedPair in s.unsat: #           v-- Assume that the pair has been stored in the proper alpha order
+            rtnActions.append( ( 'build' , unconnectedPair ) ) # the specified check should happen automatically
+        return rtnActions
+        
+    def generate_successors( self , s ):
+        """ Attempt to get all possible next states from all possible actions 'a' for ( 's' , 'a' ) --> s_prime """
+        allActions = self.get_actions( s )
+        print "DEBUG , got" , len( allActions ) , "actions:" , allActions
+        successors = []
+        for a in allActions:
+            temp = self.transition( s , a ) # Validity check for this action should happen automatically
+            print "DEBUG , Transition result:" , endl , temp , endl
+            if temp != s: # If the operation resulted in a change in state
+                successors.append( temp )
+        return successors
+    
+    def get_all_valid_states( self ):
+        """ Return a list containing all states in the assembly sequencing problem , Use with caution! """
+        rtnStates = [] # List for all valid states
+        expander = Queue() # "Frontier" for states
+        s_0 = self.gen_init_state()
+        expander.push( s_0 ) # Push the first state and expand until the Queue is exhausted
+        loopCount = 0
+        visited = set([])
+        # visited.add( s_0.ordered_rep() )
+        while len( expander ) > 0:
+            loopCount += 1
+            s = expander.pop() # pop the top state
+            # if find_state_in_list( s , rtnStates ) == None:
+            sRep = s.ordered_rep()
+            print sRep
+            if sRep not in visited:
+                rtnStates.append( s )
+                visited.add( sRep )
+                successors = self.generate_successors( s )
+                # print "DEBUG , there are" , len( successors ) , "successors"
+                for s_next in successors:
+                    if ( s_next != s ) and (s_next.ordered_rep() not in visited): # TODO: See if this extra condition eliminates states or prevents loops
+                        # print "DEBUG , there are" , len( expander ) , "items in queue"
+                        expander.push( s_next )
+                        # visited.add( s_next.ordered_rep() )
+                    # print "DEBUG , Expanded" , loopCount , "states"
+        return rtnStates
+
+# = End Exhaustive Model =
+
+# Entrapment Model , otherState.orientation_list()Right now the only difference between the exhausting and trapping representation is the action checker that is used   
+
+# = Rotation Model =
+
+# TODO:
+# [ ] Cache Designs so that calculating states doesn't take so long!
+
+class AsmRotationTransition(AsmGraphTransition):
+    """ A class to model graph transitions for assembly planning , including rotations """
+    
+    def __init__( self , templateDesign , opCheck = dummyCheck ):
+        """ Store the template design so that we can calculate transitsions  """
+        AsmGraphTransition.__init__( self , templateDesign , opCheck  )
+        self.subCache = {  } # Dict to hold pre-computed , partial designs
+        self.blkCache = {  } # Dict to hold pre-computed number of blocked build sites for each sub in each putdown orientation
+    
+    def fetch_design( self , pNamesTplSorted ):
+        """ Fetch a design based on the model design that has only 'partNamesSorted' , or cache one if it DNE """
+        if pNamesTplSorted in self.subCache: # If this sub design already exists in the cache
+            return self.subCache[ pNamesTplSorted ] # Return a reference to the sub design
+        else: # else the sub design is not in the cache
+            tempDes = self.design.get_copy( doCollide = False ) # get a non-colliding copy of the design
+            # 1. Calc Putdowns
+            tempDes.set_active_by_list_exclusive( pNamesTplSorted , True )
+            tempDes.transform_contents()
+            tempDes.set_supports_for_hull( activeOnly = True )
+            tempDes.area = 0 # Holds total area of all active parts 
+            tempDes.totalArea = 0
+            # 2. Determine if there are trapped unbuilt parts
+            allParts = tempDes.part_refs_list()
+            for part in allParts: # For each of the parts and the floor ( the floor has already been acitvated )
+                if not part.collActive: # If this part is inactive
+                    part.enclosed = part.is_trapped_simple_lab( allParts , activeOnly = True ) # Determine if the unbuilt part is trapped
+                else: # else the part is active , accumulate area of active parts so that we can make decisions based on sub mass
+                    tempDes.area += part.area
+                tempDes.totalArea += part.area # Accumulate the total Design area so that we can make decisions based on relative size
+            # 3. Store
+            self.subCache[ pNamesTplSorted ] = tempDes # Cache it!
+            return tempDes # Return it!
+    
+    # Trapped and Blocked sites are cached in a dictionary with SORTEDNAMESTUPLE as a key, each value consists of 
+    # ( ( BLOCKEDNAMESSORTED ... ) , ( TRAPPEDNAMESSORTED ... ) )
+    
+    def fetch_blocked_trapped( self , pNamesTplSorted , ornttnNum , design = None ):
+        if ( pNamesTplSorted , ornttnNum ) in self.blkCache: # If the blockage has already been computed for this 
+            return self.blkCache[ ( pNamesTplSorted , ornttnNum ) ] # Return the number of blocked sites
+        else: # else this sub-orientation has not been computed , compute and cache
+            # 1. Get the design and support information
+            if design == None: # If we were not given a design , fetch one to make the computation
+                design = self.fetch_design( pNamesTplSorted ) # This will automatically activate the needed parts
+            support = design.supports[ ornttnNum ] # Get the segment that supports the sub
+            # trappedParts = [] # Names of trapped parts for this sub
+            blockedParts = [] # Names of blocked parts for this sub
+            trappedParts = []
+            floor = floor_ref_posed_for_segment( support ) # Get a reference to the floor we will use for collisions
+            # ~~ Trapped and blocked ~~
+            allParts = design.part_refs_list()
+            partsAndFloor = allParts + [floor] 
+
+            inactiveCount =0            
+            
+            for part in allParts: # For each of the parts and the floor ( the floor has already been acitvated )
+                if not part.collActive: # If this part is inactive
+                    inactiveCount += 1
+                    # 2. Determine blocked sites by site collision with floor
+                    nextPose = part.get_Pose( frame = 'rel' ) # Get the pose of the part being investigated
+                    if next_part_collide_floor( support , part , nextPose , floor ): # If the part collides with the floor 
+                        blockedParts.append( part.name ) # catalog the blocked build location ( name )
+                    elif part.is_trapped_simple_lab( partsAndFloor , activeOnly = True ): # Determine if the unbuilt part is trapped by the floor
+                        trappedParts.append( part.name ) # Catalog the trapped part name
+                        
+            # if len( blockedParts ) == inactiveCount:
+            #     print "DEBUG , All inactive parts marked blocked!"
+
+            trpdTpl = sort_list_to_tuple( trappedParts )
+            blkdTpl = sort_list_to_tuple( blockedParts )
+            self.blkCache[ ( pNamesTplSorted , ornttnNum ) ] = ( blkdTpl , trpdTpl )
+            return ( blkdTpl , trpdTpl ) # Return the names of blocked sites that we noted
+    
+    def fetch_blocked_sites( self , pNamesTplSorted , ornttnNum , design = None ):
+        """ Fetch the number of blocked build sites based on the model design that has only 'partNamesSorted' and rests at 'ornttnNum' , or cache soln """
+        return self.fetch_blocked_trapped( pNamesTplSorted , ornttnNum , design )[0] # Return the number of blocked sites that we noted
+            
+    def fetch_blockage( self , pNamesTplSorted , ornttnNum , design = None ):
+        """ Fetch the number of blocked build sites based on the model design that has only 'partNamesSorted' and rests at 'ornttnNum' , or cache soln """
+        return len( self.fetch_blocked_trapped( pNamesTplSorted , ornttnNum , design )[0] ) # Return the number of blocked sites that we noted
+        
+    def fetch_trapped_sites( self , pNamesTplSorted , ornttnNum , design = None ):
+        """ Fetch the number of trapped build sites based on the model design that has only 'partNamesSorted' and rests at 'ornttnNum' , or cache soln """
+        return self.fetch_blocked_trapped( pNamesTplSorted , ornttnNum , design )[1] # Return the number of blocked sites that we noted
+        
+    def fetch_trapness( self , pNamesTplSorted , ornttnNum , design = None ):
+        """ Fetch the number of trapped build sites based on the model design that has only 'partNamesSorted' and rests at 'ornttnNum' , or cache soln """
+        return len( self.fetch_blocked_trapped( pNamesTplSorted , ornttnNum , design )[1] ) # Return the number of blocked sites that we noted
+    
+    def gen_init_state( self ):
+        """ Return a state that represents an assembly based on 'self.design' in which no placement and no build operations have been performed """
+        partSet = set( self.design.get_all_part_names() ) # None of the parts are placed at this point
+        edgeSet = set( self.adjGraph.edges )
+        return AsmStateOrientable( pUnplaced = partSet , pUnsat = edgeSet )
+        
+    def transition( self , s , a ):
+        """ Given state 's' and action 'a' ( ACTION , TARGET ) , return a valid next 's_prime' """
+        # print "DEBUG , Requested Action:" , a
+        if self.op_check( self , s , a ): # If this is a valid transition
+            # print "DEBUG , op check passed!"
+            s_prime = s.get_copy() # First , make a copy of the given state
+            
+            # Place Action , Place the part all by itself in a new assembly , Action takes the form ( "place" , ( PARTNAME , ORIENTATION )  )
+            if a[0] == "place": 
+                pName = a[1][0] # Name of the part to place
+                orientation = a[1][1] # the pose to place the part at
+                if ( pName not in s.placed ) and ( pName in s.unplaced ): # If we have not placed this part before , then place it
+                    # Do not make changes to s_prime if 'pName' DNE in unplaced (DNE in asm)
+                    s_prime.unplaced.remove( pName ) # Remove the part from the unplaced set # This will throw an error if DNE
+                    s_prime.placed.add( pName ) # Put the part in the placed set
+                    # s_prime.subAsm[ pName ] =  s_prime.numSubs # Assign this part to the new sub
+                    s_prime.numSubs += 1 # Increment the number of active subs   
+                    # 'check_placement' will automatically populate a hull in the copied design
+                    success , subDesign = s.check_placement( self , pName , orientation ) # Check that the requested orientation is valid # Generates design
+                    if success: # If we are allowed to put the part down at this pose
+                        s_prime.subStruct.append( [ [ pName ] , orientation , len( subDesign.hullPutdowns ) , subDesign ] ) 
+                    else: # Else we cannot put the part down at this pose , default to the first pose
+                        s_prime.subStruct.append( [ [ pName ] , 0 , len( subDesign.hullPutdowns ) , subDesign ] )
+                else: # else part is either unavailable to place or has already been placed , do nothing
+                    return s
+
+            elif a[0] == "build": # Build Action , 
+                buildPair = a[1] # Tuple of two names to assemble , The order matters , see below
+                boatName = buildPair[0] # BOAT: The sub to be moved 
+                dockName = buildPair[1] # DOCK: The sub that stays on the table
+                
+                # Assume that the op check has determined that at least one of the parts has been placed
+                
+                if ( boatName in s.placed ) and ( dockName in s.placed ): # If BOTH in the pair have already been placed , join subs
+                    boatAsm = s.get_subStruct_index_by_part_name( boatName ) # s.subAsm[ boatName ]                    
+                    dockAsm = s.get_subStruct_index_by_part_name( dockName ) # s.subAsm[ dockName ]
+                    # print "DEBUG , boat index" , boatAsm , "dock index" , dockAsm
+                    
+                    if boatAsm != dockAsm: # If this is truly joining separate subs
+                        s_prime.numSubs -= 1 # Decrement the total number of subs
+#                    for key , val in s.subAsm.iteritems():
+#                        if val == boatAsm: # If this item is the boat sub , consolidate to dock # No change if subs identical
+#                            s_prime.subAsm[ key ] = dockAsm
+                    # else just cleaning up a redundant connection between already-joined subs
+                    
+                    # Regardless of whether we consumed a sub-assembly , satisfy the edge
+                    satEdge = sort_tuple( buildPair ) # We are not guaranteed to get the proper order
+                    s_prime.unsat.remove( satEdge ) # Move the edge from unsat to satisfied # This would error if there were none to remove
+                    s_prime.satisfied.add( satEdge )
+                    # Check for redundant edges satisfied by the same action
+                    # s_prime.resolve_edges_sat()
+                    
+                    try:
+                        # Now reorder the substruct , [ [ PARTS_LIST ] , ORIENT , TOT_ORIENT_NUM , DESIGN ] , consolidate to the smaller sub num
+                        s_prime.subStruct[ dockAsm ][ 0 ].extend( 
+                            s.subStruct[ boatAsm ][ 0 ] 
+                        ) # Consolidate and sort part names
+                    except:
+                        return s
+                    s_prime.subStruct[ dockAsm ][ 0 ].sort() # Name sorting enforced
+                    # The target of a build tuple is ordered ( FROM , TO ) , FROM: The sub to be moved , TO: The sub that stays on the table
+                    oldAngle = s.get_putdown_for_sub( 
+                        #s.subAsm[ dockName ] 
+                        dockAsm
+                    ).orientation._theta # get the present orientation of the receiving sub
+                    
+                    # Activate the parts in the min sub that are present in the max sub , and recalc the new sub hull
+                    s_prime.subStruct[ dockAsm ][ 3 ] = self.fetch_design( tuple( s_prime.subStruct[ dockAsm ][ 0 ] ) )
+                    
+                    # Get the orientations of the new sub , compare them to the receiving sub orientation , and try to orient to the same
+                    nuOrietations = [ elem.orientation._theta for elem in s_prime.subStruct[ dockAsm ][ 3 ].hullPutdowns ]
+                    result = index_eq( nuOrietations , oldAngle )
+                    if result != None: # If we found an angle match , set the orientation
+                        s_prime.subStruct[ dockAsm ][ 1 ] = result
+                    else: # Else there was no angle match , default to 0
+                        s_prime.subStruct[ dockAsm ][ 1 ] = 0
+                    # Set the max number of orientations to the 
+                    s_prime.subStruct[ dockAsm ][ 2 ] = len( s_prime.subStruct[ dockAsm ][ 3 ].hullPutdowns )
+                    # Subs are fully merged , delete the old
+                    s_prime.subStruct.pop( boatAsm )
+                    # for key , val in s.subAsm.iteritems():
+#                    for key , val in s_prime.subAsm.iteritems():
+#                        if val >= boatAsm: # If a part's index is greater than the FROM index , sub will have a lower number after the merge
+#                            s_prime.subAsm[ key ] -= 1
+                    
+                elif ( ( buildPair[0] in s.unplaced ) or ( buildPair[1] in s.unplaced ) ): # else only one has been placed , add it to an existing sub
+                    plcPart = buildPair[0] if buildPair[0] in s.placed else buildPair[1] # TO: Find out which one has already been placed and store
+                    newPart = buildPair[0] if buildPair[0] not in s.placed else buildPair[1] # FROM: Find out which one has not been placed and store
+                    # print "DEBUG , new part -" , newPart ,  ", TO part -" , plcPart
+                    s_prime.unplaced.remove( newPart ) # Remove the part from the unplaced set # This will throw an error if DNE
+                    s_prime.placed.add( newPart ) # Put the part in the placed set
+                    # s_prime.subAsm[ newPart ] = s.subAsm[ plcPart ] # Assign the new part name to the same sub
+                    # print "DEBUG , old asm -" , s.subAsm , ", new asm -" , s_prime.subAsm
+                    # print "DEBUG , old struct -" , s.subStruct , ", new struct -" , s_prime.subStruct
+                    # Regardless of whether we consumed a sub-assembly , satisfy the edge
+                    satEdge = sort_tuple( buildPair ) # What if we didn't get the proper order?
+                    s_prime.unsat.remove( satEdge )
+                    s_prime.satisfied.add( satEdge )
+                    s_prime.resolve_edges_sat()
+                    # We don't have a sub to merge, so just build up the target sub
+                    # index = s_prime.subAsm[ plcPart ]
+                    index = s_prime.get_subStruct_index_by_part_name( plcPart )
+                    # print "DEBUG , index of the new part" , index , "out of" , len( s_prime.subAsm )
+                    try:
+                        oldAngle = s.get_putdown_for_sub( index ).orientation._theta # get the present orientation of the receiving sub
+                    except:
+                        return s
+                                       
+                    # Make sure to add the part to the actual sub!
+                    s_prime.subStruct[ index ][ 0 ].extend( [ newPart ] )
+                    s_prime.subStruct[ index ][ 0 ].sort() # Enforce sorted names!                    
+                    
+                    # Activate the parts in the min sub that are present in the max sub , and recalc the new sub hull
+                    s_prime.subStruct[ index ][ 3 ] = self.fetch_design( tuple( s_prime.subStruct[ index ][ 0 ] ) )
+                    
+                    # Get the orientations of the new sub , compare them to the receiving sub orientation , and try to orient to the same
+                    nuOrietations = [ elem.orientation._theta for elem in s_prime.subStruct[ index ][ 3 ].hullPutdowns ]
+                    result = index_eq( nuOrietations , oldAngle )
+                    if result != None: # If we found an angle match , set the orientation
+                        s_prime.subStruct[ index ][ 1 ] = result
+                    else: # Else there was no angle match , default to 0
+                        s_prime.subStruct[ index ][ 1 ] = 0
+                    # Set the max number of orientations to the 
+                    s_prime.subStruct[ index ][ 2 ] = len( s_prime.subStruct[ index ][ 3 ].hullPutdowns )
+                    
+                else: # else one of the parts DNE in unplaced , build does not make sense in this context
+                    return s
+                    
+            elif a[0] == 'rotate': # This is a rotation operation
+                subNum = a[1][0] ; ornttn = a[1][1] # Assume that 'ornttn' is a valid orientation
+                s_prime.subStruct[ subNum ][1] = ornttn
+            else:
+                raise ValueError( "AsmRotationTransition.transition: " + str( a[0] ) + " is not a recognized action for this problem!" )
+                
+            return s_prime # If we made it here , then we have made some change to 's_prime' , return
+        else:
+            print "AsmRotationTransition.transition: Action" , a , "was rejected!"
+            return s # Transition is not valid , Return 's_prime' unchanged
+        
+    def get_actions( self , s ):
+        """ Attempt to get all possible actions 'a' available at 's' , no validity / success checks made """
+        rtnActions = []
+        # 1. Enumerate Placements
+        for stockPart in s.unplaced:
+            totalOrnttns = len( self.fetch_design( (stockPart) ).hullPutdowns )
+            for orienttn in xrange( totalOrnttns ):
+                rtnActions.append( ( 'place' , ( stockPart , orienttn ) ) ) # the specified check should happen automatically
+        # 2. Enumerate Builds
+        for unconnectedPair in s.unsat: #  Make sure to include both FROM-->TO : A-->B , B-->A # They mean different things!
+            if unconnectedPair[1] in s.placed: rtnActions.append( ( 'build' , ( unconnectedPair[0] , unconnectedPair[1] ) ) ) # Don't add an impossible build
+            if unconnectedPair[0] in s.placed: rtnActions.append( ( 'build' , ( unconnectedPair[1] , unconnectedPair[0] ) ) ) 
+        # 3. Enumerate Rotations
+        for sDex , sub in enumerate( s.subStruct ): # For each of the current subs
+            for ornttnNum in xrange( sub[2] ): # For each of the possible orientations of the sub
+                if ornttnNum != sub[1]: # Don't rotate to the existing orientation
+                    rtnActions.append( ( 'rotate' , ( sDex , ornttnNum ) ) ) # Construct an action to rotate to that orientation
+        return rtnActions
+
+    
+        
+# = End Rotation =
+ 
+# FIXME: WE ARE TESTING THAT SUB CREATION IS NOT ENCLOSING, BUT DOES THAT NECESSARILY MEAN THAT THE PART CAN BE INSERTED
+
+       
+# == End Transition Classes ==
+
+# == Test Functions ==
+
+def trans_list_accum_states( T , actionList , statesList = [] ):
+    """ Use 'T' perfrom actions , accumulating intermediate states as they progress """
+    if len( statesList ) == 0: # If no states are supplied , gen the first state
+        statesList.append( T.gen_init_state() )
+    for a in actionList: # For each action in the list
+        statesList.append( T.transition( statesList[-1] , a ) ) # Get the outcome of applying the action at the previous state
+    return statesList # May not be necessary if we passed in a list , but here it is
+
+# == End Test ==
+
+# == Transition Tests ==
+
+if __name__ == "__main__":
+    
+    # Load a design and see what the states and transitions look like
+    
+    designFile = "first_order_buster.txt"
+    path = os.path.join( os.path.dirname( os.path.join( SOURCEDIR ) ) , 'AsmPlanner' , 'Designs' , designFile )
+    designPlan = parse_Design_from_txt( path )
+
+    # = Exhaustive Model =
+    
+    if 0: # Set to 1 to test the exhaustive model
+    
+        T = AsmGraphTransition( designPlan )
+        s_0 = T.gen_init_state()
+        s_0a = T.gen_init_state()
+        sep( "Init State" , 1 )
+        print s_0
+        print s_0.eq( s_0a )
+        print
+        
+        if False:
+            sep( "Successor States" , 1 )
+            nextStates = T.generate_successors( s_0 )
+            for state in nextStates:
+                print state
+                print
+            print "Found" , len( nextStates ) , "states!"
+            print
+        
+        if True:
+            sep( "All Valid States" , 1 )
+            nextStates = T.get_all_valid_states() # Careful!
+            if True:
+                for sDex , state in enumerate( nextStates):
+                    print sDex
+                    print state
+                    print
+            print "Found" , len( nextStates ) , "states!"
+            print "Last two states returned were equivalent:" , nextStates[-1].eq( nextStates[-2] )
+            if False:
+                print
+                print nextStates[-1]
+                print
+                print nextStates[-2]
+    
+    # = End Exhaustive =
+    
+    
+    # = Trapped Model =
+    
+    if 0: # Set to 1 to generate successors for the first state
+
+        T = AsmGraphTransition( designPlan , TrappingActionCheck )
+        s_0 = T.gen_init_state()
+        sep( "Init State" , 1 )
+        print s_0        
+        
+        sep( "Successor States" , 1 )
+        nextStates = T.generate_successors( s_0 )
+        for state in nextStates:
+            print state
+            print
+        print "Found" , len( nextStates ) , "states!"
+        print
+        
+    if 0: # Set to 1 to test enumeration of exhaustive states
+        sep( "All Valid States" , 1 )
+        nextStates = T.get_all_valid_states() # Careful!
+        if 1:
+            for sDex , state in enumerate( nextStates):
+                print sDex
+                print state
+                print
+        print "Found" , len( nextStates ) , "states!"
+        print "Last two states returned were equivalent:" , nextStates[-1].eq( nextStates[-2] )
+        if 0:
+            print
+            print nextStates[-1]
+            print
+            print nextStates[-2]
+    
+    # = End Trapped =
+    
+    # = Exhaustive / Trapped Comparison =
+    
+    if 0: # Set to 1 to test enumeration of blocking states
+        designFiles = [
+            'fully_enclosed.txt' ,
+            'first_order_buster.txt' ,
+            'second_order_buster.txt' , # Run this one overnight
+            'chair.txt' , 
+            'U_of_U.txt' , # U of U expands an order of magnitude less states if we do not expand states we have expanded before in other branches
+            'slant_one.txt' , 
+            'three_blocks.txt',
+            'snake.txt',
+            'auto_body.txt',
+            'befuddler.txt'  
+        ]
+        # For each of the paths above , load the design , calc possible exhaustive states
+
+        names , exhList , trpList = [] , [] , []
+        
+        for fName in designFiles:
+            path = os.path.join( os.path.dirname( os.path.join( SOURCEDIR ) ) , 'AsmPlanner' , 'Designs' , fName )
+            print "Working on" , fName
+            designPlan = parse_Design_from_txt( path )
+            T = AsmGraphTransition( designPlan )
+            exhStates = T.get_all_valid_states() # Careful!
+            T = AsmGraphTransition( designPlan , TrappingActionCheck )
+            trpStates = T.get_all_valid_states() # Careful!
+            names.append( fName ) ; exhList.append( len( exhStates ) ) ; trpList.append( len( trpStates ) )
+            
+    
+        lists_as_columns_with_titles( [ "Design" , "Exhaustive" , "Trapping" ] , [ names , exhList , trpList ] )
+    
+    # = End Comparison =
+    
+    # = Rotational State =
+    
+    
+    # Then iterate over these
+    designFiles = [
+        'fully_enclosed.txt' ,
+        'first_order_buster.txt' ,
+        'second_order_buster.txt' , # Run this one overnight
+        'chair.txt' , 
+        'U_of_U.txt' , # U of U expands an order of magnitude less states if we do not expand states we have expanded before in other branches
+        'slant_one.txt' , 
+        'three_blocks.txt',
+        'snake.txt',
+        'auto_body.txt',
+        'befuddler.txt'  
+    ]
+    # for fName in designFiles:
+    
+    # T = AsmGraphTransition( designPlan )
+    
+    if 1: # Set to 1 to test rotational states
+    
+        # designFile = 'first_order_buster.txt' # Test on this one 'slant_one.txt'
+        # designFile = 'slant_one.txt' # Test on this one 
+        designFile = 'three_blocks.txt' # Test on this one 
+        # designFile = 'two_blocks.txt' # Test on this one 
+        
+        fName = designFile
+        path = os.path.join( os.path.dirname( os.path.join( SOURCEDIR ) ) , 'AsmPlanner' , 'Designs' , fName )
+        designPlan = parse_Design_from_txt( path )
+        T = AsmRotationTransition( designPlan , opCheck = RotationActionCheck )
+        
+        if 0: # Set to 1 to troubleshoot executing a build operation for which both of the targets are already placed
+            print designPlan.get_all_part_names() # three_blocks: ['T_Left', 'T_Rght', 'Bttm']
+            #                                              edges: ('Bttm', 'T_Rght') , ('T_Left', 'T_Rght')
+            placements = [ ( 'place' , ( pName , 0 ) ) for pName in [ 'T_Left' , 'T_Rght' , 'Bttm' ] ]
+            # placements = [ ( 'place' , ( 'T_Rght' , 0 ) ) , ( 'place' , ( 'T_Left' , 0 ) ) ]
+            allStates = []
+            trans_list_accum_states( T , placements , allStates ) 
+            print allStates[-1] , endl
+            trans_list_accum_states( T , [ ( 'build' , ( 'T_Left' , 'T_Rght' ) ) ] , allStates ) # This one did not change the state
+            print allStates[-1] , endl
+            trans_list_accum_states( T , [ ( 'build' , ( 'Bttm'   , 'T_Rght' ) ) ] , allStates ) 
+            print allStates[-1] , endl
+               
+        if 0: # Set to 1 to test one transition
+            s_0 = T.gen_init_state()
+            sep( "Init State" , 1 )
+            print s_0 , endl 
+            s_1a = T.transition( s_0 , ('place', ( 'Bottom' , 1 ) ) ) 
+            s_1b = T.transition( s_0 , ('place', ( 'Sammich' , 1 ) ) ) 
+            s_1c = T.transition( s_0 , ('place', ( 'Bottom' , 2 ) ) ) 
+            # print s_1a , endl , endl , s_1b , endl , endl , s_1c , endl 
+            print "Are the states s_1a and s1_b equal?:" , s_1a.eq( s_1b )
+            print "Are the states s_1b and s1_c equal?:" , s_1b.eq( s_1c )
+            print "Are the states s_1a and s1_c equal?:" , s_1a.eq( s_1c )
+            
+            s_2a = T.transition( s_1a , ('place', ( 'Sammich' , 1 ) ) ) 
+            s_2b = T.transition( s_1b , ('place', ( 'Bottom' , 1 ) ) ) 
+            print "Are the states s_2a and s2_b equal?:" , s_2a.eq( s_2b ) , endl
+            print s_2a , endl , endl , s_2b , endl
+        
+        if 0: # Set to 1 to get all the possible actions from a state
+            actions = T.get_actions( s_1 )
+            for a in actions:
+                print a
+                print
+            print "Found" , len( actions ) , "actions!"
+            print    
+            
+        if 0: # Set to 1 to test successor gen
+            print
+            nxtStates = T.generate_successors( s_0 )
+            print "Found" , len( nxtStates ) , "successors"
+            for sDex , state in enumerate( nxtStates ):
+                print sDex , endl , state , endl
+                
+        if 1: # Set to 1 to test getting all possible
+            sep( "Enumerating All Possible States" , 3 )
+            nxtStates = T.get_all_valid_states()
+            if 0:
+                for sDex , state in enumerate( nxtStates ):
+                    print sDex , endl , state , endl
+            print "Found" , len( nxtStates ) , "successors"
+            
+        if 0: # Set to 1 to test the blocked sites (crystal ball) heuristic
+            fName = 'three_blocks.txt' # Test on this one 
+            path = os.path.join( os.path.dirname( os.path.join( SOURCEDIR ) ) , 'AsmPlanner' , 'Designs' , fName )
+            print "Loading" , path
+            designPlan = parse_Design_from_txt( path )
+            print "This design has:" , designPlan.get_all_part_names()
+            T = AsmRotationTransition( designPlan , opCheck = RotationActionCheck )
+            s_0 = T.gen_init_state()
+            s_1 = T.transition( s_0 , ( 'place' , ( 'T_Left' , 0 ) ) )
+            print "Placed a part:"
+            print s_1 , endl
+            for aDex , a in enumerate( [ ( 'rotate' , ( 0 , i ) ) for i in xrange( 4 ) ] ):
+                s_2 = T.transition( s_1 , a ) # Rotate the sub
+                print endl ,"Rotated the sub to orientation" , aDex , "can I build T_Left?"
+                print s_2 , endl
+                s_3 = T.transition( s_2 , ( 'build' , ( 'T_Rght' , 'T_Left' ) ) ) # FORGOT TO PROGRESS TO s_2
+                print "There are" , s_3.count_blocked_parts_for_sub( 0 ) , "blocked build locations" # You can call this function for any existing sub
+                print not s_2.eq( s_3 ) # Did this produce a new state?
+                if not s_2.eq( s_3 ):
+                    print "New state produced!" , endl #, s_3
+                else:
+                    print "No change in state!"
+    
+    # = End Rotational =
+
+# == End Tests ==
