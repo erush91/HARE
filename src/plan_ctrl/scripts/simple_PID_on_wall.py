@@ -99,6 +99,8 @@ def compose_HARE_ctrl_msg( steerAngle , linearSpeed , orgnStr = "FSM" ):
     # Return msg
     return ack_msg
 
+_STATETRANS = [ 0.10 , 0.00 , -0.10 , 0.00 ]
+
 # __ End Func __
 
 
@@ -153,6 +155,13 @@ class CarFSM:
         self.steerAngle  = 0.0
         self.linearSpeed = 0.0 # [ -1 ,  1 ]
         
+        # 7. Test vars
+        self.t_test = 0.0
+        self.t_incr = 0.025
+        self.t_curr = 0.0
+        self.t_last = rospy.Time.now().to_sec()
+        self.Tstate = 0
+        
     def near_avg( self ):
         """ Average of the nearest points """
         return np.mean( self.lastScan[ :self.nearN ] )
@@ -163,10 +172,23 @@ class CarFSM:
         # print "Got a scanner message with" , len( msg.intensities ) , "readings!"
         # ~ print "Scan:" , self.lastScan
         # print "Scan Min:" , min( self.lastScan ) , ", Scan Max:" , max( self.lastScan )
-        if 1: # DIRTY HACK
+        if 0: # DIRTY HACK
             self.lastScan = [ elem/25.50 for elem in msg.data ] # scale [0,255] to [0,10]
         else:
             self.lastScan = msg.data
+        
+    def test_state( self ):
+        """ Run the drive motor forwards and backwards while performing a sine sweep on the steering angle """
+        # 1. Set the steering angle
+        self.t_curr += self.t_incr
+        self.steerAngle = pi/2 * sin( self.t_curr )
+        # 2. Set the throttle
+        self.t_curr = rospy.Time.now().to_sec()
+        # A. If more than 1 second has passed since the last transition, advance to the next speed state
+        if self.t_curr - self.t_last > 1.0:
+            self.Tstate = ( self.Tstate + 1 ) % len( _STATETRANS )
+            self.linearSpeed = _STATETRANS[ self.t_curr ]
+            self.t_last = self.t_curr
         
     def wall_follow_state( self ):
         """ Try to maintain a set distance from the wall """
