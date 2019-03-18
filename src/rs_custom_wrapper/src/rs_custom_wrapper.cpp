@@ -40,7 +40,7 @@ int main(int argc, char * argv[]) try
 
     bool CV_IMSHOW_VISUALIZER_FLAG = 0;
     bool DEPTH_RGB_FLAG = 0;
-    bool DEPTH_METERS_FLAG = 0;
+    bool DEPTH_METERS_FLAG = 1;
     bool LASER_FLAG = 0;
 
     bool DEPTH_FLAG = 0;
@@ -62,7 +62,10 @@ int main(int argc, char * argv[]) try
 
     nh_.param("DEPTH_RGB_FLAG", DEPTH_RGB_FLAG, DEPTH_RGB_FLAG);
     
-    nh_.param("DEPTH_METERS_FLAG", DEPTH_METERS_FLAG, DEPTH_METERS_FLAG);
+    if( 1 ) // DIRTY HACK
+        DEPTH_METERS_FLAG = true;
+    else
+        nh_.param("/rs_custom_wrapper/DEPTH_METERS_FLAG", DEPTH_METERS_FLAG, DEPTH_METERS_FLAG);
     
     nh_.param("LASER_FLAG", LASER_FLAG, CV_IMSHOW_VISUALIZER_FLAG);
     

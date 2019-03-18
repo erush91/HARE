@@ -151,7 +151,7 @@ class CarFSM:
         self.K_p = 0.4000
         # ~ Control Output ~
         self.steerAngle  = 0.0
-        self.linearSpeed = 0.1 # [ -1 ,  1 ]
+        self.linearSpeed = 0.0 # [ -1 ,  1 ]
         
     def near_avg( self ):
         """ Average of the nearest points """
@@ -163,7 +163,10 @@ class CarFSM:
         # print "Got a scanner message with" , len( msg.intensities ) , "readings!"
         # ~ print "Scan:" , self.lastScan
         # print "Scan Min:" , min( self.lastScan ) , ", Scan Max:" , max( self.lastScan )
-        self.lastScan = msg.data
+        if 1: # DIRTY HACK
+            self.lastScan = [ elem/25.50 for elem in msg.data ] # scale [0,255] to [0,10]
+        else:
+            self.lastScan = msg.data
         
     def wall_follow_state( self ):
         """ Try to maintain a set distance from the wall """
@@ -188,7 +191,7 @@ class CarFSM:
         auto_steer = u_p + u_i + u_d
         self.steerAngle = auto_steer
 
-        print 'translation error:' , translation_err , 'steer:' , self.steerAngle
+        print 'mean:' , np.mean( self.lastScan ) ,' translation error:' , translation_err , 'steer:' , self.steerAngle
         # ~ robot.move(steering_angle, speed)
         
         

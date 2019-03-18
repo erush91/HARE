@@ -88,6 +88,7 @@ void image_filter_cb( const sensor_msgs::Image& msg ){
          currSample = 0 ;
     // 0. Zero out sums
     vec_assign_all_same( sums , 0.0 );
+    vec_assign_all_same( distance_arr , 0.0 );
     
     // 1. For every sampled row
     for( uint i = 0 ; i < numLin ; i++ ){
