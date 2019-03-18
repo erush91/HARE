@@ -390,6 +390,12 @@ std::vector<size_t> vec_index_zeros( size_t len ){
     return rntVec;
 }
 
+std::vector<float> vec_float_zeros( size_t len ){
+    std::vector<float> rntVec;
+    for( size_t i = 0 ; i < len ; i++ ){  rntVec.push_back( 0.0f );  }
+    return rntVec;
+}
+
 std::vector<double> vec_dbbl_zeros( size_t len ){
     std::vector<double> rntVec;
     for( size_t i = 0 ; i < len ; i++ ){  rntVec.push_back( 0.0d );  }

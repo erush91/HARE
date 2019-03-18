@@ -23,7 +23,7 @@ Template Version: 2018-06-25
 // Publish
 #include <std_msgs/MultiArrayLayout.h>
 #include <std_msgs/MultiArrayDimension.h>
-#include <std_msgs/Float64MultiArray.h>
+#include <std_msgs/Float32MultiArray.h>
 // ~~ Local ~~
 #include <Cpp_Helpers.h> // C++ Utilities and Shortcuts
 #include <ROS_Helpers.h> // ROS Utilities and Shortcuts
@@ -47,9 +47,9 @@ int /* --------- */ numPts; // ----- Number of points in the output array
 int /* --------- */ numLin; // ----- Number of rows to process
 std::vector<int>    scanRows; // --- Indices of matrix rows to process
 string /* ------ */ imageTopic; // - Topic that depth images will be streamed to 
-std::vector<double> distance_arr; // Array to store filtered data
-std::vector<double> sums; // ------- 
-std::vector<double> blockLen; // --- Number of elements needed for each sampled point
+std::vector<float> distance_arr; // Array to store filtered data
+std::vector<float> sums; // ------- 
+std::vector<float> blockLen; // --- Number of elements needed for each sampled point
 std::vector<uint>   sampleBounds; // Indiced of the buckets to sample from
 int /* --------- */ imageWidth; // - Width of the depth image
 int /* --------- */ imageHeight; //- Height of the depth image
@@ -64,8 +64,8 @@ string /* ---- */ defaultCamTopic = "/camera/depth/image_rect_raw"; // Default t
 std::vector<uint> even_index_bounds( uint total , uint divisions ){
     // Return the ending indices of that will split 'total' into roughly-equal 'divisions'
     std::vector<uint> rtnBounds;
-    double stepSize = total * 1.0 / divisions;
-    double runTot = stepSize;
+    float stepSize = total * 1.0 / divisions;
+    float runTot = stepSize;
     while( runTot < total ){
         rtnBounds.push_back(  (uint) round( runTot )  );
         runTot += stepSize;
@@ -82,14 +82,27 @@ std::vector<uint> elem_count_bounds( const std::vector<uint>& bucketBounds ){
     return nums;
 }
 
-void image_filter_cb( const sensor_msgs::Image& msg ){
+void image_filter_cb( const std_msgs::Float32MultiArray& msg ){
     // Filter and store the depth data in a format that the controller will understand
+
+    bool SHOWDEBUG = true;
+
     uint curRow     = 0 , 
          currSample = 0 ;
     // 0. Zero out sums
-    vec_assign_all_same( sums , 0.0 );
-    vec_assign_all_same( distance_arr , 0.0 );
+    vec_assign_all_same( sums , 0.0f );
+    vec_assign_all_same( distance_arr , 0.0f );
     
+    if( SHOWDEBUG ){
+        uint dims = msg.layout.dim.size();
+        cout << "There are " << dims << " dimensions" << endl;
+        for( uint i = 0 ; i < dims ; i++ ){
+            cout << "\tDimension [" << i << "] - label: " << msg.layout.dim[i].label 
+                 << " , size: " << msg.layout.dim[i].size 
+                 << " , stride: " << msg.layout.dim[i].stride << endl;
+        }
+    }
+
     // 1. For every sampled row
     for( uint i = 0 ; i < numLin ; i++ ){
         // 2. Assign row  &&  Reset sample
@@ -152,7 +165,7 @@ int main( int argc , char** argv ){ // Main takes the terminal command and flags
 	// 3. Set up subscribers and publishers
 	
 	// ~ Publishers ~
-	ros::Publisher arr_pub    = nodeHandle.advertise<std_msgs::Float64MultiArray>( "/filtered_distance" , QUEUE_LEN );
+	ros::Publisher arr_pub    = nodeHandle.advertise<std_msgs::Float32MultiArray>( "/filtered_distance" , QUEUE_LEN );
 	
 	// ~ Subscribers ~
 	ros::Subscriber image_sub = nodeHandle.subscribe( imageTopic , QUEUE_LEN , image_filter_cb ); 
@@ -172,15 +185,15 @@ int main( int argc , char** argv ){ // Main takes the terminal command and flags
 	/// == PRE-LOOP WORK ===================================================================================================================
 		
     // A. Set up the output array(s)
-    distance_arr = vec_dbbl_zeros( numPts ); // Pre-allocate an array
-    sums         = vec_dbbl_zeros( numPts ); // Pre-allocate an array
-    blockLen     = vec_dbbl_zeros( numPts ); // Pre-allocate an array
+    distance_arr = vec_float_zeros( numPts ); // Pre-allocate an array
+    sums         = vec_float_zeros( numPts ); // Pre-allocate an array
+    blockLen     = vec_float_zeros( numPts ); // Pre-allocate an array
     sampleBounds = even_index_bounds( imageWidth , numPts );
     std::vector<uint> widths = elem_count_bounds( sampleBounds );
     for( uint i = 0 ; i < numPts ; i++ ){  blockLen[i] = widths[i] * 1.0 * numLin;  }
     	
     // B. Instantiate message
-    std_msgs::Float64MultiArray flt_dist_msg;
+    std_msgs::Float32MultiArray flt_dist_msg;
         
 	/// __ END PRE-LOOP ____________________________________________________________________________________________________________________
 	

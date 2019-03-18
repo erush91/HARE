@@ -42,7 +42,7 @@ from sensor_msgs.msg import Joy # NOT USED?
 # ~ from ackermann_msgs.msg import AckermannDriveStamped
 # ~ from sensor_msgs.msg import LaserScan # http://www.theconstructsim.com/read-laserscan-data/
 from std_msgs.msg import String
-from std_msgs.msg import Float64MultiArray
+from std_msgs.msg import Float32MultiArray
 from geometry_msgs.msg import PoseStamped, Point, Twist
 from ros_pololu_servo.msg import MotorCommand
 from ros_pololu_servo.msg import HARECommand
@@ -124,7 +124,7 @@ class CarFSM:
         self.idle = rospy.Rate( self.heartBeatHz ) # Best effort to maintain 'heartBeatHz' , URL: http://wiki.ros.org/rospy/Overview/Time        
         
         # 3. Start subscribers and listeners
-        rospy.Subscriber( "/filtered_distance" , Float64MultiArray , self.scan_cb )
+        rospy.Subscriber( "/filtered_distance" , Float32MultiArray , self.scan_cb )
         self.numReadings = 100
         self.lastScan = [ 0 for i in range( self.numReadings ) ]
         
@@ -185,10 +185,13 @@ class CarFSM:
         # 2. Set the throttle
         self.t_curr = rospy.Time.now().to_sec()
         # A. If more than 1 second has passed since the last transition, advance to the next speed state
-        if self.t_curr - self.t_last > 1.0:
-            self.Tstate = ( self.Tstate + 1 ) % len( _STATETRANS )
-            self.linearSpeed = _STATETRANS[ self.Tstate ]
-            self.t_last = self.t_curr
+        if 1:
+            self.linearSpeed = 0.0
+        else:
+            if self.t_curr - self.t_last > 1.0:
+                self.Tstate = ( self.Tstate + 1 ) % len( _STATETRANS )
+                self.linearSpeed = _STATETRANS[ self.Tstate ]
+                self.t_last = self.t_curr
         
     def wall_follow_state( self ):
         """ Try to maintain a set distance from the wall """
@@ -235,6 +238,7 @@ class CarFSM:
             
             # 3. Transmit the control effort
             if 1:
+                print( "Steering Angle:" , self.steerAngle , ", Speed:" , self.linearSpeed )
                 self.drive_pub.publish(  compose_HARE_ctrl_msg( self.steerAngle , self.linearSpeed )  )
             
             # N-1: Wait until the node is supposed to fire next

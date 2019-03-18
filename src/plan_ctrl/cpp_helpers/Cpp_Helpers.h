@@ -465,6 +465,8 @@ std::vector<T> vec_range( T lo , T hi ){
 
 std::vector<size_t> vec_index_zeros( size_t len );
 
+std::vector<float> vec_float_zeros( size_t len );
+
 std::vector<double> vec_dbbl_zeros( size_t len );
 
 std::vector<std::vector<double>> vec_vec_dbbl_zeros( size_t len ); // Return a square vector of zeros

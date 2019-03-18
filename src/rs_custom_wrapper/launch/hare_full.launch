@@ -11,7 +11,7 @@
 
     <!-- Start Filter -->
     <rosparam command="load" file="$(find plan_ctrl)/config.yaml" />
-    <node name="cam_arr_filter" pkg="plan_ctrl" type="rs_array_filter" />
+    <node name="cam_arr_filter" pkg="plan_ctrl" type="rs_array_filter" output="screen" />
 
     <!-- Start Planner -->
     <node name="CarFSM" pkg="plan_ctrl" type="simple_PID_on_wall.py" output="screen" />
