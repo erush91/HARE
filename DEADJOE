@@ -1,0 +1,24 @@
+
+*** These modified files were found in JOE when it aborted on Mon Mar 18 12:29:17 2019
+*** JOE was aborted because the terminal closed
+
+*** File '(Unnamed)'
+/home/odroid/HARE/.git/COMMIT_EDITMSG
+
+*** File '/home/odroid/HARE/.git/COMMIT_EDITMSG'
+Fixed depth conversion to meters and cleaned up old code
+# Please enter the commit message for your changes. Lines starting
+# with '#' will be ignored, and an empty message aborts the commit.
+#
+# On branch master
+# Your branch is up to date with 'origin/master'.
+#
+# Changes to be committed:
+#	modified:   rs_custom_wrapper.cpp
+#
+
+*** File '* Startup Log *'
+Processing '/etc/joe/editorrc'...
+Processing '/etc/joe/ftyperc'...
+Finished processing /etc/joe/ftyperc
+Finished processing /etc/joe/editorrc

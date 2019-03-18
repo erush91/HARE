@@ -187,7 +187,7 @@ class CarFSM:
         # A. If more than 1 second has passed since the last transition, advance to the next speed state
         if self.t_curr - self.t_last > 1.0:
             self.Tstate = ( self.Tstate + 1 ) % len( _STATETRANS )
-            self.linearSpeed = _STATETRANS[ self.t_curr ]
+            self.linearSpeed = _STATETRANS[ self.Tstate ]
             self.t_last = self.t_curr
         
     def wall_follow_state( self ):
@@ -228,7 +228,10 @@ class CarFSM:
                 self.drive_pub.publish(  compose_ack_ctrl_msg( pi/8 , 2.0 )  )
                 
             # 2. Generate a control effort
-            self.wall_follow_state()
+            if 0:
+                self.wall_follow_state()
+            else:
+                self.test_state()
             
             # 3. Transmit the control effort
             if 1:
