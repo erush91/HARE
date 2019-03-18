@@ -11,6 +11,7 @@
 #include <ros/ros.h>
 
 #include "std_msgs/String.h"
+#include "std_msgs/Float32MultiArray.h"
 
 // Used rs-imshow as a go-by
 #include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
@@ -106,11 +107,6 @@ int main(int argc, char * argv[]) try
     //////////////////////////////
     // SET REALSENSE FRAME SIZE //
     //////////////////////////////
-    
-    // D435: Use 848x480 resolution @30fps, with auto-exposure. Use post processing with downsample 2.
-    // https://github.com/IntelRealSense/librealsense/wiki/D400-Series-Visual-Presets
-   
-    // WE WANT 848 x 480 RESOLUTION AT 30 FPS
 
     // Configured depth stream
     cfg.enable_stream(RS2_STREAM_DEPTH, DEPTH_WIDTH, DEPTH_HEIGHT, RS2_FORMAT_Z16, DEPTH_FPS);
@@ -142,17 +138,6 @@ int main(int argc, char * argv[]) try
     // Find depth scale (to meters)
     auto scale =  depth_sensor.get_depth_scale();
 
-    ////////////////////////////////////////
-    // GET REALSENSE INTRINSIC PARAMETERS //
-    ////////////////////////////////////////
-    // DOES NOT WORK!!!!!!
-    //auto const intrinsics = pipe.get_active_profile().get_stream(RS2_STREAM_DEPTH).as<rs2::video_stream_profile>().get_intrinsics();
-
-    ////////////////////////////////////////
-    // GET REALSENSE EXTRINSIC PARAMETERS //
-    ////////////////////////////////////////
-    //pipe.get_active_profile().get_stream(RS2_STREAM_DEPTH).as<rs2::video_stream_profile>().get_extrinsics_to(depth_sensor& to);
-
     //////////////////////////
     // TURN LASER ON OR OFF //
     //////////////////////////
@@ -182,90 +167,6 @@ int main(int argc, char * argv[]) try
             depth_sensor.set_option(RS2_OPTION_LASER_POWER, 0.f); // Disable laser
         }
     }
-
-    //////////////////////////////////
-    // CONFIGURE REALSENSE SETTINGS //
-    //////////////////////////////////
-
-    // How to load json files
-    // https://github.com/IntelRealSense/librealsense/issues/1021
-
-    // Provides json files for different applications
-    // https://github.com/IntelRealSense/librealsense/wiki/D400-Series-Visual-Presets
-    // https://github.com/IntelRealSense/librealsense/issues/1235
-
-    // Miscellaneous forums
-    // https://github.com/IntelRealSense/librealsense/issues/2193
-    // https://github.com/IntelRealSense/librealsense/issues/1171
-    // https://github.com/IntelRealSense/librealsense/issues/1235
-
-    // White paper
-    // https://www.intel.com/content/www/us/en/support/articles/000027833/emerging-technologies/intel-realsense-technology.html
-    // https://www.intel.com/content/dam/support/us/en/documents/emerging-technologies/intel-realsense-technology/BKMs_Tuning_RealSense_D4xx_Cam.pdf
-
-    // https://stackoverflow.com/questions/53520301/how-to-load-json-file-to-realsense-d435-camera-using-c-and-intel-api
-    // Obtain a list of device_list currently present on the system
-
-    // Load camera settings (.json file)
-    // https://stackoverflow.com/questions/53520301/how-to-load-json-file-to-realsense-d435-camera-using-c-and-intel-api
-    // https://github.com/IntelRealSense/librealsense/issues/1229
-
-    ///////////////////////////////////////
-    // LOAD .JSON FILE (REALSEN SETTINGS //
-    ///////////////////////////////////////
-    
-    // rs2::context ctx;
-    // auto device_list = ctx.query_devices();
-    // size_t device_count = device_list.size();
-    // if (!device_count)
-    // {
-    //     cout <<"No device detected. Is it plugged in?\n";
-    //     return EXIT_SUCCESS;
-    // }
-
-    // // Get the first connected device
-    // auto dev0 = device_list[0];
-
-    // // Enter advanced mode
-    // if (dev0.is<rs400::advanced_mode>())pub_image_depth_8b
-    // {
-    //     // Get the advanced mode functionality
-    //     auto advanced_mode_dev = dev0.as<rs400::advanced_mode>();
-
-    //     // Load and configure .json file to device
-    //     std::ifstream t("./src/depth/json/DefaultPreset_D435.json"); //HighResHighAccuracyPreset.json
-    //     std::string str((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
-    //     advanced_mode_dev.load_json(str);
-    // }
-    // else
-    // {
-    //     cout << "Current device doesn't support advanced-mode!\n";
-    //     return EXIT_FAILURE;
-    // }
-
-    //////////////////////////////////////
-    // CONFIGURE AUTO EXPOSURE SETTINGS //
-    //////////////////////////////////////
-    
-    // TO DO
-
-    // WE WANT TO DOWNSAMPLE 2
-    // https://github.com/IntelRealSense/librealsense/wiki/D400-Series-Visual-Presets
-
-    // WE WANT TO TURN ON AUTO EXPOSURE
-    // https://github.com/IntelRealSense/librealsense/wiki/D400-Series-Visual-Presets
-    
-    // NOT SURE HOW TO DO THIS, FORUMS SUGGEST POINTS
-    // https://software.intel.com/sites/landingpage/realsense/camera-sdk/v1.1/documentation/html/member_functions_neutral_device_pxccapture.html
-    // https://github.com/IntelRealSense/librealsense/issues/1542
-    //dev->EnableAutoExposure(1.0f);
-    //static rs2_option get_sensor_option(const dev& AutoExposure);
-
-    //////////////////////////////////////
-    // CONFIGURE DOWN SAMPLING SETTINGS //
-    //////////////////////////////////////
-
-    // TO DO
     
     ////////////////////////////////////////////
     // CONFIGURE IMSHOW VISUALIZATION WINDOWS //
@@ -298,20 +199,21 @@ int main(int argc, char * argv[]) try
     // https://answers.ros.org/question/99831/publish-file-to-image-topic/
 
     ros::Publisher pub_image_depth_RGB = nh_.advertise<sensor_msgs::Image>("/camera/depth_RGB/image_rect_raw", 1);
-    ros::Publisher pub_image_depth_meters = nh_.advertise<sensor_msgs::Image>("/camera/depth/image_rect_raw", 1);
+    ros::Publisher pub_image_depth_meters = nh_.advertise<std_msgs::Float32MultiArray>("/camera/depth/image_rect_raw", 1);
     ros::Publisher pub_image_infrared_left = nh_.advertise<sensor_msgs::Image>("/camera/infra1/image_rect_raw", 1);
     ros::Publisher pub_image_infrared_right = nh_.advertise<sensor_msgs::Image>("/camera/infra2/image_rect_raw", 1);
-    
-    //////////////////////////
-    // GET REALSENSE FRAMES //
-    //////////////////////////
-    //rs2::pipeline_profile selection = pipe.start();
-    //auto depth_stream = profile.get_stream(RS2_STREAM_DEPTH);
-    //auto color_stream = profile.get_stream(RS2_STREAM_COLOR);
-    //rs2::rs2_extrinsics e = depth_stream.get_extrinsics_to(color_stream);
 
-    // Pre-allocate the depth matrix
+    // Pre-allocate the depth matrix and message
     cv::Mat mat_depth_meters(Size(DEPTH_WIDTH, DEPTH_HEIGHT), CV_32FC1);
+
+    std_msgs::Float32MultiArray depth_msg;
+    depth_msg.layout.dim.push_back(std_msgs::MultiArrayDimension());
+    depth_msg.layout.dim[0].label = "height";
+    depth_msg.layout.dim[0].size = DEPTH_HEIGHT;
+    depth_msg.layout.dim[0].stride =  DEPTH_HEIGHT * DEPTH_WIDTH;
+    depth_msg.layout.dim[0].label = "width";
+    depth_msg.layout.dim[0].size = DEPTH_WIDTH;
+    depth_msg.layout.dim[0].stride =  DEPTH_WIDTH;
 
     while (nh_.ok() && waitKey(1) < 0) 
     {
@@ -323,52 +225,9 @@ int main(int argc, char * argv[]) try
 
         if(first_loop_flag == 1)
         {
-            /////////////////////////////////////////
-            // PRINT DEPTH FRAME SIZE TO TERIMINAL //
-            /////////////////////////////////////////
-
             cout << "Collecting data..." << endl;
-
-            //cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" << endl;
-            //cout << "CV_IMSHOW_VISUALIZER_FLAG: " << CV_IMSHOW_VISUALIZER_FLAG << endl;
-            //cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" << endl;
-            //cout << "DEPTH_RGB_FLAG: " << DEPTH_RGB_FLAG << endl;
-            //cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" << endl;
-            //cout << "DEPTH_METERS_FLAG: " << DEPTH_METERS_FLAG << endl;      
-            //cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" << endl;
-            //cout << "LASER_FLAG: " << LASER_FLAG << endl;
-            //cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" << endl;
-            //cout << "DEPTH_FLAG: " << DEPTH_FLAG << endl;
-            //cout << "DEPTH FRAME SIZE: [" << DEPTH_WIDTH << ", " << DEPTH_HEIGHT << "]" << endl;
-            //cout << "DEPTH_FPS: " << DEPTH_FPS << endl;
-            //cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" << endl;
-            //cout << "INFRARED_FLAG: " << INFRARED_FLAG << endl;
-            //cout << "INFRARED FRAME SIZE: [" << INFRARED_WIDTH << ", " << INFRARED_HEIGHT << "]" << endl;
-            //cout << "INFRARED_FPS: " << INFRARED_FPS << endl;
-            //cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" << endl;
-            //cout << "COLOR_FLAG: " << COLOR_FLAG << endl;
-            //cout << "COLOR FRAME SIZE: [" << COLOR_WIDTH << ", " << COLOR_HEIGHT << "]" << endl;
-            //cout << "COLOR_FPS: " << COLOR_FPS << endl;
-            //cout << "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" << endl;
-            //ROS_INFO("%d", rs2_extrinsics); 
-            /////////////////////////
-            // INITIALIZE MATRICES //
-            /////////////////////////
-
-            // http://answers.opencv.org/question/113449/how-to-initialize-mat-size-and-fill-it-with-zeros-in-a-class/
-
-            // cv::Mat mat_depth_RGB(cv::Size(DEPTH_WIDTH, DEPTH_HEIGHT), CV_64FC1);
-            // cv::Mat mat_infrared_left = cv::Mat::zeros(cv::Size(INFRARED_WIDTH, INFRARED_HEIGHT), CV_8UC1);
-            // cv::Mat mat_infrared_right = cv::Mat::zeros(cv::Size(INFRARED_WIDTH, INFRARED_HEIGHT), CV_8UC1);
-
             first_loop_flag = 0;
         }
-
-        ///////////////////////////////
-        // PRINT FRAME # TO TERMINAL //
-        ///////////////////////////////
-
-        //cout << "Frame # " << cnt << endl;
 
         //////////////////////////////
         // WAIT FOR REALSENSE FRAME //
@@ -434,22 +293,17 @@ int main(int argc, char * argv[]) try
             if(DEPTH_METERS_FLAG)
             {
                 // Obtain depth image (meters) for calculations
-                //https://stackoverflow.com/questions/6302171/convert-uchar-mat-to-float-mat-in-opencv
                 mat_depth_16b.convertTo(mat_depth_meters, CV_32F, scale);
-
-                //////////////////////////////////////////
-                // CONVERT CV:MAT to SENSOR_MSGS::IMAGE //
-                //////////////////////////////////////////
-                cv_bridge::CvImage cv_image_depth_meters;
-                cv_image_depth_meters.image = mat_depth_meters;
-                cv_image_depth_meters.encoding = "mono16";
-                sensor_msgs::Image ros_image_depth_meters;
-                cv_image_depth_meters.toImageMsg(ros_image_depth_meters);
+//                mat_depth_meters.reshape(0,1); 
+                
+                // copy in the data
+                depth_msg.data.clear();
+                depth_msg.data.insert(depth_msg.data.end(), (float*)mat_depth_meters.datastart, (float*)mat_depth_meters.dataend);
 
                 ////////////////////////////////////////
                 // PUBLISH ROS MESSAGES TO ROS TOPICS //
                 ////////////////////////////////////////
-                pub_image_depth_meters.publish(ros_image_depth_meters);
+                pub_image_depth_meters.publish(depth_msg);
             }
         }
 
