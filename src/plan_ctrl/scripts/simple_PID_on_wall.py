@@ -181,13 +181,13 @@ class CarFSM:
         """ Run the drive motor forwards and backwards while performing a sine sweep on the steering angle """
         # 1. Set the steering angle
         self.t_curr += self.t_incr
-        self.steerAngle = pi/2 * sin( self.t_curr )
+        self.steerAngle = pi/4 * sin( self.t_curr )
         # 2. Set the throttle
-        self.t_curr = rospy.Time.now().to_sec()
-        # A. If more than 1 second has passed since the last transition, advance to the next speed state
         if 1:
             self.linearSpeed = 0.0
         else:
+            self.t_curr = rospy.Time.now().to_sec()
+            # A. If more than 1 second has passed since the last transition, advance to the next speed state
             if self.t_curr - self.t_last > 1.0:
                 self.Tstate = ( self.Tstate + 1 ) % len( _STATETRANS )
                 self.linearSpeed = _STATETRANS[ self.Tstate ]

@@ -8,7 +8,10 @@ from ros_pololu_servo.msg import HARECommand
 
 steering_cmd_msg = MotorCommand()
 motor_cmd_msg = MotorCommand()
-def cmd_cb(msg):
+
+def cmd_cb( msg ):
+    #globals steering_cmd_msg , motor_cmd_msg
+
     # Limit incoming message to steering limits
     if msg.steering_angle > .78:
         msg.steering_angle = .78
@@ -33,6 +36,8 @@ def cmd_cb(msg):
 
 
 def msg_publisher():
+    #globals steering_cmd_msg , motor_cmd_msg
+
     cmd_sub = rospy.Subscriber('/HARE_high_level_command', HARECommand, cmd_cb )
     msg_pub = rospy.Publisher('/pololu/command', MotorCommand, queue_size=10)
     rospy.init_node('cmd_publisher', anonymous=True)

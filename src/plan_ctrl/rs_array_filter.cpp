@@ -85,7 +85,7 @@ std::vector<uint> elem_count_bounds( const std::vector<uint>& bucketBounds ){
 void image_filter_cb( const std_msgs::Float32MultiArray& msg ){
     // Filter and store the depth data in a format that the controller will understand
 
-    bool SHOWDEBUG = true;
+    bool SHOWDEBUG = false;
 
     uint curRow     = 0 , 
          currSample = 0 ;
