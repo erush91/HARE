@@ -45,7 +45,7 @@ def getKey():
 if __name__=="__main__":
     settings = termios.tcgetattr(sys.stdin)
 
-    pub = rospy.Publisher('HARE_high_level_command', HARECommand, queue_size = 1)
+    pub = rospy.Publisher( 'HARE_high_level_command', HARECommand , queue_size = 1)
     rospy.init_node('HARE_teleop')
 
     speed = rospy.get_param("~speed", 0.5)

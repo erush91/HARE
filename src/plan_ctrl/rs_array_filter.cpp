@@ -54,8 +54,8 @@ std::vector<uint>   sampleBounds; // Indiced of the buckets to sample from
 int /* --------- */ imageWidth; // - Width of the depth image
 int /* --------- */ imageHeight; //- Height of the depth image
 // ~ Defaults ~
-std::vector<int>  dfltRows /*- */ = { 720-380 , 720-430 , 720-480 }; // Default rows to sample
-string /* ---- */ defaultCamTopic = "/camera/depth/image_rect_raw"; //- Default topic for depth image
+std::vector<int>  dfltRows /*- */ = { 310 , 260 , 210 }; // ---------- Default rows to sample
+string /* ---- */ defaultCamTopic = "/camera/depth/image_rect_raw"; // Default topic for depth image
 // ___ End Vars ___
 
 

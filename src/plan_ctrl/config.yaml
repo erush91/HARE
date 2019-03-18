@@ -3,10 +3,11 @@
 # ~~ Filter Config ~~
 numpoints: 100
 scanlines:   3
-scan_rows: [ 380 , 430 , 480 ]
-imagewdth: 1280
-imagehght:  720
+scan_rows: [ 310 , 260 , 210 ]
+imagewdth: 640
+imagehght: 360
 
 # ~~ Node Config ~~
 publ_rate: 30
 imagtopic: /camera/depth/image_rect_raw
+drivtopic: HARE_high_level_command

@@ -77,9 +77,17 @@ def unpack_ROS_xform( xform ):
 
 # == Math Helpers ==
 
-def eq_margin( op1 , op2 , margin = EPSILON ): 
+def eq_margin( op1 , op2 , margin = EPSILON ):
     """ Return true if op1 and op2 are within 'margin' of each other, where 'margin' is a positive real number """
     return abs( op1 - op2 ) <= margin
+    
+def clamp_val( val , lims ):
+    """ Return a version of val that is clamped to the range [ lims[0] , lims[1] ] , inclusive """
+    if val < lims[0]:
+        return lims[0]
+    if val > lims[1]:
+        return lims[1]
+    return val
 
 # __ End Math __
 

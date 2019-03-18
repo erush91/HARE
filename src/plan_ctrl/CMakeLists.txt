@@ -99,11 +99,11 @@ set( ROS_HELP_CPP cpp_helpers/ROS_Helpers.cpp ) # Shortcut for the "ROS_Helpers"
 
 # ~~~ <EXEC NAME HERE> ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-add_executable( depth_filter 
+add_executable( rs_array_filter 
 			    rs_array_filter.cpp
 			    ${CPP_HELP_CPP} ${ROS_HELP_CPP} )
 
-target_link_libraries( depth_filter
+target_link_libraries( rs_array_filter
 					   ${catkin_LIBRARIES} )
 
 # ___ END EXECUTABLES _________________________________________________________________________________________________________________________
