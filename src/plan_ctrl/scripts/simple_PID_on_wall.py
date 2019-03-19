@@ -231,7 +231,7 @@ class CarFSM:
                 self.drive_pub.publish(  compose_ack_ctrl_msg( pi/8 , 2.0 )  )
                 
             # 2. Generate a control effort
-            if 0:
+            if 1:
                 self.wall_follow_state()
             else:
                 self.test_state()
