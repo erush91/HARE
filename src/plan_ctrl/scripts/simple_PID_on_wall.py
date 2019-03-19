@@ -153,7 +153,7 @@ class CarFSM:
         self.K_p = 0.4000
         # ~ Control Output ~
         self.steerAngle  = 0.0
-        self.linearSpeed = 0.0 # [ -1 ,  1 ]
+        self.linearSpeed = rospy.get_param("LINEAR_SPEED") # [ -1 ,  1 ]
         
         # 7. Test vars
         self.t_test = 0.0
@@ -231,7 +231,7 @@ class CarFSM:
                 self.drive_pub.publish(  compose_ack_ctrl_msg( pi/8 , 2.0 )  )
                 
             # 2. Generate a control effort
-            if 0:
+            if 1:
                 self.wall_follow_state()
             else:
                 self.test_state()

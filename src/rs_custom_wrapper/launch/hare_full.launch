@@ -14,6 +14,7 @@
     <node name="cam_arr_filter" pkg="plan_ctrl" type="rs_array_filter" output="screen" />
 
     <!-- Start Planner -->
+    <param name="LINEAR_SPEED" type="double" value="0.1"/>
     <node name="CarFSM" pkg="plan_ctrl" type="simple_PID_on_wall.py" output="screen" />
     
 </launch>
