@@ -153,6 +153,7 @@ class CarFSM:
         self.K_p = 0.4000
         # ~ Control Output ~
         self.steerAngle  = 0.0
+        self.prevSteerAngle = 0.0
         self.linearSpeed = rospy.get_param("LINEAR_SPEED") # [ -1 ,  1 ]
         
         # 7. Test vars
@@ -214,10 +215,17 @@ class CarFSM:
         u_p = self.K_p * translation_err
 
         auto_steer = u_p + u_i + u_d
-        self.steerAngle = auto_steer
 
-        print 'mean:' , np.mean( self.lastScan ) ,' translation error:' , translation_err , 'steer:' , self.steerAngle
-        # ~ robot.move(steering_angle, speed)
+        # check to see if the new steering angle is large enough to warrant a command
+        # this prevents micro commands to the servo
+        if np.abs(auto_steer - self.prevSteerAngle) > 0.1:
+            self.prevSteerAngle = self.steerAngle
+            self.steerAngle = auto_steer
+
+            print 'mean:' , np.mean( self.lastScan ) ,' translation error:' , translation_err , 'steer:' , self.steerAngle
+            return True
+        else:
+            return False
         
         
     def run( self ):
@@ -231,13 +239,14 @@ class CarFSM:
                 self.drive_pub.publish(  compose_ack_ctrl_msg( pi/8 , 2.0 )  )
                 
             # 2. Generate a control effort
+            sendCommand = True
             if 1:
-                self.wall_follow_state()
+                sendCommand = self.wall_follow_state()
             else:
                 self.test_state()
             
             # 3. Transmit the control effort
-            if 1:
+            if sendCommand:
                 print( "Steering Angle:" , self.steerAngle , ", Speed:" , self.linearSpeed )
                 self.drive_pub.publish(  compose_HARE_ctrl_msg( self.steerAngle , self.linearSpeed )  )
             
