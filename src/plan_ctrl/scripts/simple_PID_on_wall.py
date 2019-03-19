@@ -154,6 +154,7 @@ class CarFSM:
         # ~ Control Output ~
         self.steerAngle  = 0.0
         self.prevSteerAngle = 0.0
+        self.angleDiffMin = rospy.get_param("ANGLE_DIFF_MIN") # limits micro commands
         self.linearSpeed = rospy.get_param("LINEAR_SPEED") # [ -1 ,  1 ]
         
         # 7. Test vars
@@ -218,7 +219,7 @@ class CarFSM:
 
         # check to see if the new steering angle is large enough to warrant a command
         # this prevents micro commands to the servo
-        if np.abs(auto_steer - self.prevSteerAngle) > 0.1:
+        if np.abs(auto_steer - self.prevSteerAngle) > self.angleDiffMin:
             self.prevSteerAngle = self.steerAngle
             self.steerAngle = auto_steer
 
