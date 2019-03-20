@@ -194,6 +194,11 @@ class CarFSM:
                 self.Tstate = ( self.Tstate + 1 ) % len( _STATETRANS )
                 self.linearSpeed = _STATETRANS[ self.Tstate ]
                 self.t_last = self.t_curr
+
+    def center_stop_state( self ):
+        """ Set the steering and speed to 0 """
+        self.steerAngle  = 0.0
+        self.linearSpeed = 0.0
         
     def wall_follow_state( self ):
         """ Try to maintain a set distance from the wall """
@@ -243,8 +248,10 @@ class CarFSM:
             sendCommand = True
             if 1:
                 sendCommand = self.wall_follow_state()
-            else:
+            elif 0:
                 self.test_state()
+            else:
+                self.center_stop_state()
             
             # 3. Transmit the control effort
             if sendCommand:
