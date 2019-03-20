@@ -144,13 +144,13 @@ class CarFSM:
         # 6. Driving Vars
         self.err_hist_window = 25 # Width of the integration window
         self.err_hist        = [ 0 for i in range( self.err_hist_window ) ] # Integration window
-        self.wallSetPnt      =  1.75 # [m]
+        self.wallSetPnt      =  1.0 # [m]
         self.nearN           = 30 # Count this many points as near the average
         self.slope_window    =  5 # Look this many points in the past to compute slope
         # ~ PID ~
-        self.K_d = 0.0000
-        self.K_i = 0.00000
-        self.K_p = 0.4000
+        self.K_d = rospy.get_param("D_VALUE")
+        self.K_i = rospy.get_param("I_VALUE")
+        self.K_p = rospy.get_param("P_VALUE")
         # ~ Control Output ~
         self.steerAngle  = 0.0
         self.prevSteerAngle = 0.0
@@ -223,7 +223,7 @@ class CarFSM:
             self.prevSteerAngle = self.steerAngle
             self.steerAngle = auto_steer
 
-            print 'mean:' , np.mean( self.lastScan ) ,' translation error:' , translation_err , 'steer:' , self.steerAngle
+            #print 'mean:' , np.mean( self.lastScan ) ,' translation error:' , translation_err , 'steer:' , self.steerAngle
             return True
         else:
             return False
@@ -248,7 +248,7 @@ class CarFSM:
             
             # 3. Transmit the control effort
             if sendCommand:
-                print( "Steering Angle:" , self.steerAngle , ", Speed:" , self.linearSpeed )
+                #print( "Steering Angle:" , self.steerAngle , ", Speed:" , self.linearSpeed )
                 self.drive_pub.publish(  compose_HARE_ctrl_msg( self.steerAngle , self.linearSpeed )  )
             
             # N-1: Wait until the node is supposed to fire next
