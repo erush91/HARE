@@ -56,3 +56,6 @@ cmake-build-debug/
 */*/*/*/*/*.gz
 */*/*/*/*/*/*.gz
 .ipynb_checkpoints/
+.catkin_tools/
+logs/
+src/mitcar_bkup/
