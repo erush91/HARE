@@ -73,6 +73,10 @@ def compose_ack_ctrl_msg( steerAngle , linearSpeed , orgnStr = "FSM" ):
     # Return msg
     return ack_msg
 
+def eq_margin( op1 , op2 , margin = EPSILON ): 
+    """ Return true if op1 and op2 are within 'margin' of each other, where 'margin' is a positive real number """
+    return abs( op1 - op2 ) <= margin
+
 # __ End Func __
 
 
@@ -111,18 +115,20 @@ class CarFSM:
         self.drive_pub = rospy.Publisher( self.driveTopic , AckermannDriveStamped , queue_size = 10 )
         
         # 5. Init vars
-        self.initTime = rospy.Time.now().to_sec()       
+        self.initTime = rospy.Time.now().to_sec() # Time that the node was started      
+        self.lastTime = self.initTime # ----------- Time that the last loop began
         
         # 6. Driving Vars
         self.err_hist_window = 25 # Width of the integration window
         self.err_hist        = [ 0 for i in range( self.err_hist_window ) ] # Integration window
-        self.wallSetPnt      =  1.75 # [m]
+        self.tim_hist        = [ 0 for i in range( self.err_hist_window ) ] # Integration window
+        self.wallSetPnt      =  2.25 # [m]
         self.nearN           = 30 # Count this many points as near the average
-        self.slope_window    =  5 # Look this many points in the past to compute slope
+        self.slope_window    = 10 # Look this many points in the past to compute slope
         # ~ PID ~
-        self.K_d = 0.0000
+        self.K_d = 0.0080
         self.K_i = 0.00000
-        self.K_p = 0.4000
+        self.K_p = 0.8000
         # ~ Control Output ~
         self.steerAngle  = 0.0
         self.linearSpeed = 4.0
@@ -130,6 +136,19 @@ class CarFSM:
     def near_avg( self ):
         """ Average of the nearest points """
         return np.mean( self.lastScan[ :self.nearN ] )
+    
+    def avg_nonzero( self ):
+        """ Return the average of the nonzero elements only """
+        numNonZ = 0.0 # Number of items that are nonzero
+        totNonZ = 0.0 # Sum of items that are nonzero
+        for elem in self.lastScan:
+            if not eq_margin( elem , 0.0 ):
+                numNonZ += 1.0
+                totNonZ += elem
+        if totNonZ > 0:
+            return totNonZ / numNonZ
+        else:
+            return 0.0
         
     def scan_cb( self , msg ):
         """ Process the scan that comes back from the scanner """
@@ -139,21 +158,53 @@ class CarFSM:
         # print "Scan Min:" , min( self.lastScan ) , ", Scan Max:" , max( self.lastScan )
         self.lastScan = msg.intensities # Do I need to copy this?
         
+    def integrate_err( self ):
+        """ Rectangular integration of error over time """
+        curveArea = 0.0
+        for i in xrange( self.err_hist_window ):
+            curveArea += self.err_hist[i] * self.tim_hist[i]
+        return curveArea
+    
+    def rate_err( self ):
+        """ Average time rate of change in error over a window """
+        rateTot = 0.0
+        for i in xrange( self.slope_window ):
+            change     = self.err_hist[ -(i) ] - self.err_hist[ -(i+1) ]
+            if self.tim_hist[ -(i) ] > 0:
+                rateChange = change / self.tim_hist[ -(i) ]
+            else:
+                rateChange = 0.0
+            rateTot   += rateChange
+        return rateTot / self.slope_window
+        
     def wall_follow_state( self ):
         """ Try to maintain a set distance from the wall """
+        
+        # 0. record loop duration
+        nowTime = rospy.Time.now().to_sec() # -- Get the current time
+        loopDuration = nowTime - self.lastTime # Time delta between the start of this loop and the start of the last loop
+        self.tim_hist.append( loopDuration )
+        if len( self.tim_hist) >= self.err_hist_window:
+            self.tim_hist.pop(0) 
+        self.lastTime = nowTime
+        
         # 1. Calculate and store error
-        translation_err = ( self.wallSetPnt - np.mean( self.lastScan ) )
-        # ~ translation_err = ( self.wallSetPnt - self.near_avg() )
+        if 0:
+            translation_err = ( self.wallSetPnt - np.mean( self.lastScan ) )
+        elif 1:
+            translation_err = ( self.wallSetPnt - self.avg_nonzero() )
+        else:
+            translation_err = ( self.wallSetPnt - self.near_avg() )
         self.err_hist.append( translation_err )
         
         if len( self.err_hist ) >= self.err_hist_window:
             self.err_hist.pop(0)
-            u_i = self.K_i * sum( self.err_hist )
+            u_i = self.K_i * self.integrate_err()
         else:
             u_i = 0
 
         if self.linearSpeed > 0.1: 
-            u_d = self.K_d * ( self.err_hist[-1] - self.err_hist[ -(self.slope_window-1) ] ) 
+            u_d = self.K_d * self.rate_err( )
         else: 
             u_d = 0
         
