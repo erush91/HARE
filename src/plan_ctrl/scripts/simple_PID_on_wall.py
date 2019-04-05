@@ -226,7 +226,7 @@ class CarFSM:
         # this prevents micro commands to the servo
         if np.abs(auto_steer - self.prevSteerAngle) > self.angleDiffMin:
             self.prevSteerAngle = self.steerAngle
-            self.steerAngle = auto_steer
+            self.steerAngle = -auto_steer
 
             #print 'mean:' , np.mean( self.lastScan ) ,' translation error:' , translation_err , 'steer:' , self.steerAngle
             return True
