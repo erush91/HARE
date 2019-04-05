@@ -5,14 +5,13 @@
 from __future__ import division # Future imports must be called before everything else, including triple-quote docs!
 
 __progname__ = "simple_PID_on_wall.py"
-__version__  = "2019.03" 
+__version__  = "2019.04" 
 __desc__     = "A Finite State Machine for autonomous car motion planning"
 """
 James Watson , Template Version: 2019-02-21
 Built on Wing 101 IDE for Python 2.7
 
 Dependencies: numpy , rospy
-
 
 NOTE: Incomming array will come in CW instead of CCW as in the sim!
 """
@@ -101,6 +100,10 @@ def compose_HARE_ctrl_msg( steerAngle , linearSpeed , orgnStr = "FSM" ):
 
 _STATETRANS = [ 0.10 , 0.00 , -0.10 , 0.00 ]
 
+def eq_margin( op1 , op2 , margin = EPSILON ): 
+    """ Return true if op1 and op2 are within 'margin' of each other, where 'margin' is a positive real number """
+    return abs( op1 - op2 ) <= margin
+
 # __ End Func __
 
 
@@ -128,7 +131,6 @@ class CarFSM:
         self.numReadings = 100
         self.lastScan = [ 0 for i in range( self.numReadings ) ]
         
-        
         # 4. Start publishers
         try:
             self.driveTopic = str( rospy.get_param( "/drivtopic" ) )
@@ -139,23 +141,25 @@ class CarFSM:
         self.drive_pub = rospy.Publisher( 'HARE_high_level_command' , HARECommand , queue_size = 10 )
         
         # 5. Init vars
-        self.initTime = rospy.Time.now().to_sec()       
+        self.initTime = rospy.Time.now().to_sec() # Time that the node was started      
+        self.lastTime = self.initTime # ----------- Time that the last loop began
         
         # 6. Driving Vars
         self.err_hist_window = 25 # Width of the integration window
         self.err_hist        = [ 0 for i in range( self.err_hist_window ) ] # Integration window
+        self.tim_hist        = [ 0 for i in range( self.err_hist_window ) ] # Integration window
         self.wallSetPnt      =  1.0 # [m]
         self.nearN           = 30 # Count this many points as near the average
-        self.slope_window    =  5 # Look this many points in the past to compute slope
+        self.slope_window    = 10 # Look this many points in the past to compute slope
         # ~ PID ~
         self.K_d = rospy.get_param("D_VALUE")
         self.K_i = rospy.get_param("I_VALUE")
         self.K_p = rospy.get_param("P_VALUE")
         # ~ Control Output ~
-        self.steerAngle  = 0.0
+        self.steerAngle     = 0.0
         self.prevSteerAngle = 0.0
-        self.angleDiffMin = rospy.get_param("ANGLE_DIFF_MIN") # limits micro commands
-        self.linearSpeed = rospy.get_param("LINEAR_SPEED") # [ -1 ,  1 ]
+        self.angleDiffMin   = rospy.get_param( "ANGLE_DIFF_MIN" ) # limits micro commands
+        self.linearSpeed    = rospy.get_param( "LINEAR_SPEED"   ) # [ -1 ,  1 ]
         
         # 7. Test vars
         self.t_test = 0.0
@@ -167,6 +171,19 @@ class CarFSM:
     def near_avg( self ):
         """ Average of the nearest points """
         return np.mean( self.lastScan[ :self.nearN ] )
+    
+    def avg_nonzero( self ):
+            """ Return the average of the nonzero elements only """
+            numNonZ = 0.0 # Number of items that are nonzero
+            totNonZ = 0.0 # Sum of items that are nonzero
+            for elem in self.lastScan:
+                if not eq_margin( elem , 0.0 ):
+                    numNonZ += 1.0
+                    totNonZ += elem
+            if totNonZ > 0:
+                return totNonZ / numNonZ
+            else:
+                return 0.0    
         
     def scan_cb( self , msg ):
         """ Process the scan that comes back from the scanner """
@@ -194,45 +211,74 @@ class CarFSM:
                 self.Tstate = ( self.Tstate + 1 ) % len( _STATETRANS )
                 self.linearSpeed = _STATETRANS[ self.Tstate ]
                 self.t_last = self.t_curr
-
-    def center_stop_state( self ):
-        """ Set the steering and speed to 0 """
-        self.steerAngle  = 0.0
-        self.linearSpeed = 0.0
+        
+    def integrate_err( self ):
+        """ Rectangular integration of error over time """
+        curveArea = 0.0
+        for i in xrange( self.err_hist_window ):
+            curveArea += self.err_hist[i] * self.tim_hist[i]
+        return curveArea
+        
+    def rate_err( self ):
+        """ Average time rate of change in error over a window """
+        rateTot = 0.0
+        for i in xrange( self.slope_window ):
+            change     = self.err_hist[ -(i) ] - self.err_hist[ -(i+1) ]
+            if self.tim_hist[ -(i) ] > 0:
+                rateChange = change / self.tim_hist[ -(i) ]
+            else:
+                rateChange = 0.0
+            rateTot   += rateChange
+        return rateTot / self.slope_window    
         
     def wall_follow_state( self ):
         """ Try to maintain a set distance from the wall """
+        
+        # 0. record loop duration
+        nowTime = rospy.Time.now().to_sec() # -- Get the current time
+        loopDuration = nowTime - self.lastTime # Time delta between the start of this loop and the start of the last loop
+        self.tim_hist.append( loopDuration )
+        if len( self.tim_hist) >= self.err_hist_window:
+            self.tim_hist.pop(0) 
+        self.lastTime = nowTime        
+        
         # 1. Calculate and store error
-        translation_err = ( self.wallSetPnt - np.mean( self.lastScan ) )
-        # ~ translation_err = ( self.wallSetPnt - self.near_avg() )
+        if 0: # - A. Straight Average
+            translation_err = ( self.wallSetPnt - np.mean( self.lastScan ) )
+        elif 1: # B. Nonzero Average
+            translation_err = ( self.wallSetPnt - self.avg_nonzero() )
+        else: # - C. Average of near points only (UNTESTED ON ACTUAL)
+            translation_err = ( self.wallSetPnt - self.near_avg() )
         self.err_hist.append( translation_err )
         
+        # 1.5. Proportional Term
+        u_p = self.K_p * translation_err
+        
+        # 2. Integral Term
         if len( self.err_hist ) >= self.err_hist_window:
             self.err_hist.pop(0)
-            u_i = self.K_i * sum( self.err_hist )
+            u_i = self.K_i * self.integrate_err()
         else:
             u_i = 0
 
+        # 3. Derivative Term
         if self.linearSpeed > 0.1: 
-            u_d = self.K_d * ( self.err_hist[-1] - self.err_hist[ -(self.slope_window-1) ] ) 
+            u_d = self.K_d * self.rate_err()
         else: 
             u_d = 0
-        
-        u_p = self.K_p * translation_err
 
+        # 4. Calculate control effort
         auto_steer = u_p + u_i + u_d
 
-        # check to see if the new steering angle is large enough to warrant a command
-        # this prevents micro commands to the servo
-        if np.abs(auto_steer - self.prevSteerAngle) > self.angleDiffMin:
+        # 5. Check to see if the new steering angle is large enough to warrant a command this prevents micro commands to the servo
+        #    True  : There is a sufficiently different command to publish
+        #    False : Microcommand, do not publish
+        if np.abs( auto_steer - self.prevSteerAngle ) > self.angleDiffMin:
             self.prevSteerAngle = self.steerAngle
             self.steerAngle = -auto_steer
-
-            #print 'mean:' , np.mean( self.lastScan ) ,' translation error:' , translation_err , 'steer:' , self.steerAngle
             return True
         else:
             return False
-        
         
     def run( self ):
         """ Take a distance reading and generate a control signal """
@@ -240,20 +286,20 @@ class CarFSM:
         # 1. While ROS is running
         while ( not rospy.is_shutdown() ):
             
-            # 1. Drive Test
+            # 1. Calculate a control effort
+            
+            # A. Drive Test
             if 0:
                 self.drive_pub.publish(  compose_ack_ctrl_msg( pi/8 , 2.0 )  )
                 
-            # 2. Generate a control effort
+            # B. Generate a control effort
             sendCommand = True
             if 1:
                 sendCommand = self.wall_follow_state()
-            elif 0:
-                self.test_state()
             else:
-                self.center_stop_state()
+                self.test_state()
             
-            # 3. Transmit the control effort
+            # 2. Transmit the control effort
             if sendCommand:
                 #print( "Steering Angle:" , self.steerAngle , ", Speed:" , self.linearSpeed )
                 self.drive_pub.publish(  compose_HARE_ctrl_msg( self.steerAngle , self.linearSpeed )  )
