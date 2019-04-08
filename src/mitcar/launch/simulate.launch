@@ -6,7 +6,12 @@
   <node pkg="racecar_simulator" name="joy_ctrl" type="joy_ctrl"/>
 
   <!-- Launch a map from the maps folder-->
-  <arg name="map" default="$(find racecar_simulator)/maps/hall_w_doors.yaml"/>
+
+  <!--   <arg name="map" default="$(find racecar_simulator)/maps/hall_w_doors.yaml"/>   -->
+  <arg name="map" default="$(find racecar_simulator)/maps/ECCR_basement_map_v2.yaml"/>   
+  <!-- <arg name="map" default="$(find racecar_simulator)/maps/ECCR_basement_map_v2_w_pallets.yaml"/> -->
+
+
   <node pkg="map_server" name="map_server" type="map_server" args="$(arg map)"/>
 
   <!-- Launch the racecar model -->
