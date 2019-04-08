@@ -31,8 +31,6 @@ if RunningOdroid:
 else: 
     rospy.Subscriber( "/scan" , LaserScan , scan_cb )
 	
-# plt.ion()
-
 try:
 	while ( not rospy.is_shutdown() ):
 		lastScanNP = np.asarray(lastScan)
@@ -51,12 +49,4 @@ try:
 	plt.show()
 except KeyboardInterrupt:
 	pass
-
-# plt.close
-
-while ( not rospy.is_shutdown() ):
-    plt.clf()
-    plt.plot(lastScan)
-    plt.pause(0.001)
-
 
