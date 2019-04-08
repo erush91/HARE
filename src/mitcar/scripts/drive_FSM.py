@@ -270,7 +270,6 @@ class CarFSM:
         self.old_right_side_scans = right_side_scans
             
         translation_err = (cent_of_maxes - 50)
-        self.FSM_K_p = 0.0050
         
         u_p = self.FSM_K_p * translation_err
 
