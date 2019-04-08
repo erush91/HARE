@@ -105,6 +105,9 @@ class CarFSM:
         #self.lastScan = [ 0 for i in range( self.numReadings ) ]
         self.lastScan = [ 70 for i in range( self.numReadings ) ]
         
+        self.good_signal = True
+        self.one_shot = True
+        
         
         # 4. Start publishers
         try:
@@ -190,7 +193,20 @@ class CarFSM:
         self.lastTime = nowTime
         
         # 1. Calculate and store error
-        translation_err = ( self.wallSetPnt - np.mean( self.lastScan ) )
+        lastScanNP = np.asarray(self.lastScan)
+        above_thresh = np.where(lastScanNP > 9)[0]
+
+        if len(above_thresh) >=2:
+            cent_of_maxes = np.mean(above_thresh)
+            self.linearSpeed = 4.0
+            self.good_signal = True
+        else: 
+            self.good_signal = False
+            cent_of_maxes = 50
+            self.linearSpeed = 0.0
+        translation_err = (cent_of_maxes - 50)
+        self.K_p = 0.0050
+        # translation_err = ( self.wallSetPnt - np.mean( self.lastScan ) )
         #if 0:
         #    translation_err = ( self.wallSetPnt - np.mean( self.lastScan ) )
         #elif 1:
@@ -212,7 +228,7 @@ class CarFSM:
         
         u_p = self.K_p * translation_err
 
-        auto_steer = u_p + u_i + u_d
+        auto_steer = u_p # + u_i + u_d
         self.steerAngle = auto_steer
 
         print 'translation error:' , translation_err , 'steer:' , self.steerAngle
@@ -233,8 +249,13 @@ class CarFSM:
             self.wall_follow_state()
             
             # 3. Transmit the control effort
-            if 1:
+            #if 1:
+            
+            if self.good_signal or self.one_shot:
                 self.drive_pub.publish(  compose_ack_ctrl_msg( self.steerAngle , self.linearSpeed )  )
+                if self.good_signal: self.one_shot = True
+                else: self.one_shot = False
+             
             
             # N-1: Wait until the node is supposed to fire next
             self.idle.sleep()        

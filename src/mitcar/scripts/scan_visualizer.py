@@ -21,9 +21,24 @@ rospy.init_node('scan_sherlock', anonymous=True)
 rospy.Subscriber( "/scan" , LaserScan , scan_cb )
 	
 # plt.ion()
-while ( not rospy.is_shutdown() ):
-	plt.clf()
-	plt.plot(lastScan)
-	plt.pause(0.001)
+try:
+	while ( not rospy.is_shutdown() ):
+		lastScanNP = np.asarray(lastScan)
+		above_thresh = np.where(lastScanNP > 9)[0]
+		# print(above_thresh)
+		# print(lastScan)
+		plt.clf()
+		plt.plot(lastScanNP,'bo')
+		plt.hold(True)
+		vis_maxes = np.zeros((len(lastScan)))
+		if len(above_thresh) >=2:
+			vis_maxes[above_thresh] = lastScanNP[above_thresh]
+			plt.plot(vis_maxes,'ro')
+			print(np.mean(above_thresh))
+		plt.pause(0.001)
+	plt.show()
+except KeyboardInterrupt:
+	pass
 
-plt.show()
+# plt.close
+
