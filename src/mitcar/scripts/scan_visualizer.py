@@ -2,25 +2,37 @@
 import numpy as np
 import rospy 
 from sensor_msgs.msg import LaserScan
+from std_msgs.msg import Float32MultiArray
 import matplotlib.pyplot as plt
 
 numReadings = 100
 lastScan = [ 0 for i in range( numReadings ) ]
 
+RunningOdroid = False
+
+
 def scan_cb( msg ):
-	global lastScan
-	""" Process the scan that comes back from the scanner """
-	# NOTE: Scan progresses from least theta to most theta: CCW
-	# print "Got a scanner message with" , len( msg.intensities ) , "readings!"
-	# ~ print "Scan:" , self.lastScan
-	# print "Scan Min:" , min( self.lastScan ) , ", Scan Max:" , max( self.lastScan )
-	lastScan = msg.intensities # Do I need to copy this?
+    global lastScan
+    """ Process the scan that comes back from the scanner """
+    # NOTE: Scan progresses from least theta to most theta: CCW
+    # print "Got a scanner message with" , len( msg.intensities ) , "readings!"
+    # ~ print "Scan:" , self.lastScan
+    # print "Scan Min:" , min( self.lastScan ) , ", Scan Max:" , max( self.lastScan )
+
+    if RunningOdroid: 
+        lastScan = msg.data  #lastScan = [ elem/25.50 for elem in msg.data ] # scale [0,255] to [0,10]
+    else: 
+        lastScan = msg.intensities 
 	
 rospy.init_node('scan_sherlock', anonymous=True)
 	
-rospy.Subscriber( "/scan" , LaserScan , scan_cb )
+if RunningOdroid: 
+    rospy.Subscriber( "/filtered_distance" , Float32MultiArray , scan_cb )
+else: 
+    rospy.Subscriber( "/scan" , LaserScan , scan_cb )
 	
 # plt.ion()
+
 try:
 	while ( not rospy.is_shutdown() ):
 		lastScanNP = np.asarray(lastScan)
@@ -41,4 +53,10 @@ except KeyboardInterrupt:
 	pass
 
 # plt.close
+
+while ( not rospy.is_shutdown() ):
+    plt.clf()
+    plt.plot(lastScan)
+    plt.pause(0.001)
+
 
