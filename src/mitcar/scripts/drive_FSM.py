@@ -102,7 +102,8 @@ class CarFSM:
         # 3. Start subscribers and listeners
         rospy.Subscriber( "/scan" , LaserScan , self.scan_cb )
         self.numReadings = 100
-        self.lastScan = [ 0 for i in range( self.numReadings ) ]
+        #self.lastScan = [ 0 for i in range( self.numReadings ) ]
+        self.lastScan = [ 70 for i in range( self.numReadings ) ]
         
         
         # 4. Start publishers
@@ -122,7 +123,7 @@ class CarFSM:
         self.err_hist_window = 25 # Width of the integration window
         self.err_hist        = [ 0 for i in range( self.err_hist_window ) ] # Integration window
         self.tim_hist        = [ 0 for i in range( self.err_hist_window ) ] # Integration window
-        self.wallSetPnt      =  2.25 # [m]
+        self.wallSetPnt      =  3.0 # [m]
         self.nearN           = 30 # Count this many points as near the average
         self.slope_window    = 10 # Look this many points in the past to compute slope
         # ~ PID ~
@@ -189,12 +190,13 @@ class CarFSM:
         self.lastTime = nowTime
         
         # 1. Calculate and store error
-        if 0:
-            translation_err = ( self.wallSetPnt - np.mean( self.lastScan ) )
-        elif 1:
-            translation_err = ( self.wallSetPnt - self.avg_nonzero() )
-        else:
-            translation_err = ( self.wallSetPnt - self.near_avg() )
+        translation_err = ( self.wallSetPnt - np.mean( self.lastScan ) )
+        #if 0:
+        #    translation_err = ( self.wallSetPnt - np.mean( self.lastScan ) )
+        #elif 1:
+        #    translation_err = ( self.wallSetPnt - self.avg_nonzero() )
+        #else:
+        #    translation_err = ( self.wallSetPnt - self.near_avg() )
         self.err_hist.append( translation_err )
         
         if len( self.err_hist ) >= self.err_hist_window:
