@@ -44,7 +44,7 @@ try:
 		if len(above_thresh) >=2:
 			vis_maxes[above_thresh] = lastScanNP[above_thresh]
 			plt.plot(vis_maxes,'ro')
-			print(np.mean(above_thresh))
+			# print(np.mean(above_thresh))
 		plt.pause(0.001)
 	plt.show()
 except KeyboardInterrupt:

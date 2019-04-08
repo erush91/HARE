@@ -102,11 +102,14 @@ class CarFSM:
         # 3. Start subscribers and listeners
         rospy.Subscriber( "/scan" , LaserScan , self.scan_cb )
         self.numReadings = 100
-        #self.lastScan = [ 0 for i in range( self.numReadings ) ]
-        self.lastScan = [ 70 for i in range( self.numReadings ) ]
+        self.lastScan = [ 0 for i in range( self.numReadings ) ]
+        self.num_right_scans = 5
+        self.old_right_side_scans = np.ones((self.num_right_scans))*20
         
         self.good_signal = True
         self.one_shot = True
+        self.close_eyes_and_go_straight_state = False
+        self.close_eyes_and_turn_right_state = False
         
         
         # 4. Start publishers
@@ -196,14 +199,33 @@ class CarFSM:
         lastScanNP = np.asarray(self.lastScan)
         above_thresh = np.where(lastScanNP > 9)[0]
 
-        if len(above_thresh) >=2:
+        right_side_scans = np.mean(lastScanNP[0:self.num_right_scans])
+		# this sets the state transition flag based on "good signal"
+        if len(above_thresh) >=10:
             cent_of_maxes = np.mean(above_thresh)
             self.linearSpeed = 4.0
             self.good_signal = True
+            self.close_eyes_and_turn_right_state = False
         else: 
             self.good_signal = False
+            #right_side_scans = np.mean(lastScanNP[0:self.num_right_scans])
+            
+            # one shot state transition the first time we lose a good hall following signal
+            if not self.close_eyes_and_go_straight_state and not self.close_eyes_and_turn_right_state:
+				self.close_eyes_and_go_straight_state = True 
+				
+            elif self.close_eyes_and_go_straight_state:
+				# if right_side_scans - self.old_right_side_scans > 3:
+                if lastScanNP[0] - self.old_right_side_scans > 0.3:
+					self.close_eyes_and_go_straight_state = False
+					self.close_eyes_and_turn_right_state = True
+            print('no good signal', right_side_scans, lastScanNP[0] - self.old_right_side_scans, self.close_eyes_and_go_straight_state,self.close_eyes_and_turn_right_state)
+            # self.old_right_side_scans = right_side_scans
+            
             cent_of_maxes = 50
-            self.linearSpeed = 0.0
+            # self.linearSpeed = 0.0
+        self.old_right_side_scans = right_side_scans
+            
         translation_err = (cent_of_maxes - 50)
         self.K_p = 0.0050
         # translation_err = ( self.wallSetPnt - np.mean( self.lastScan ) )
@@ -228,10 +250,17 @@ class CarFSM:
         
         u_p = self.K_p * translation_err
 
-        auto_steer = u_p # + u_i + u_d
-        self.steerAngle = auto_steer
+        if self.good_signal:
+            auto_steer = u_p # + u_i + u_d
+            self.steerAngle = auto_steer
+        else: 
+			if self.close_eyes_and_go_straight_state:
+				self.steerAngle = self.steerAngle # do nothing
+			if self.close_eyes_and_turn_right_state:
+				self.steerAngle = -0.1
+				
 
-        print 'translation error:' , translation_err , 'steer:' , self.steerAngle
+        # print 'translation error:' , translation_err , 'steer:' , self.steerAngle
         # ~ robot.move(steering_angle, speed)
         
         
@@ -251,10 +280,11 @@ class CarFSM:
             # 3. Transmit the control effort
             #if 1:
             
-            if self.good_signal or self.one_shot:
-                self.drive_pub.publish(  compose_ack_ctrl_msg( self.steerAngle , self.linearSpeed )  )
-                if self.good_signal: self.one_shot = True
-                else: self.one_shot = False
+            self.drive_pub.publish(  compose_ack_ctrl_msg( self.steerAngle , self.linearSpeed )  )
+            #if self.good_signal or self.one_shot:
+            #    self.drive_pub.publish(  compose_ack_ctrl_msg( self.steerAngle , self.linearSpeed )  )
+            #    if self.good_signal: self.one_shot = True
+            #    else: self.one_shot = False
              
             
             # N-1: Wait until the node is supposed to fire next
