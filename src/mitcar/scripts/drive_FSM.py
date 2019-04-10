@@ -103,6 +103,13 @@ class CarFSM:
         rospy.Subscriber( "/scan" , LaserScan , self.scan_cb )
         self.numReadings = 100
         self.lastScan = [ 0 for i in range( self.numReadings ) ]
+        self.num_right_scans = 5
+        self.old_right_side_scans = np.ones((self.num_right_scans))*20
+        
+        self.good_signal = True
+        self.one_shot = True
+        self.close_eyes_and_go_straight_state = False
+        self.close_eyes_and_turn_right_state = False
         
         
         # 4. Start publishers
@@ -122,13 +129,15 @@ class CarFSM:
         self.err_hist_window = 25 # Width of the integration window
         self.err_hist        = [ 0 for i in range( self.err_hist_window ) ] # Integration window
         self.tim_hist        = [ 0 for i in range( self.err_hist_window ) ] # Integration window
-        self.wallSetPnt      =  2.25 # [m]
+        self.wallSetPnt      =  3.0 # [m]
         self.nearN           = 30 # Count this many points as near the average
         self.slope_window    = 10 # Look this many points in the past to compute slope
         # ~ PID ~
         self.K_d = 0.0080
         self.K_i = 0.00000
         self.K_p = 0.8000
+        self.FSM_K_p = 0.005
+        
         # ~ Control Output ~
         self.steerAngle  = 0.0
         self.linearSpeed = 4.0
@@ -176,7 +185,7 @@ class CarFSM:
                 rateChange = 0.0
             rateTot   += rateChange
         return rateTot / self.slope_window
-        
+
     def wall_follow_state( self ):
         """ Try to maintain a set distance from the wall """
         
@@ -216,6 +225,66 @@ class CarFSM:
         print 'translation error:' , translation_err , 'steer:' , self.steerAngle
         # ~ robot.move(steering_angle, speed)
         
+    def hallway_FSM( self ):
+        """ State 1 - Steer at the center of the patch of max distances 
+        
+        transition, not enough scan entries greater than a set threshold that is near the camera max
+        
+        State 2 - Drive straight (maybe add some decelleration here), note this only works if our control coming
+        into this state is relatively straight and stable
+        
+        transition, looking at the right side of the scan data, a large change indicates beam passed off the
+        corner so the turn should begin
+        
+        State 3 - Drive with a set right hand turn angle 
+        
+        transition, camera maxes are once again found and State 1 is reentered
+        """
+
+        
+        # 1. Calculate and store error
+        lastScanNP = np.asarray(self.lastScan)
+        above_thresh = np.where(lastScanNP > 9)[0]
+
+        right_side_scans = np.mean(lastScanNP[0:self.num_right_scans])
+		# this sets the state transition flag based on "good signal"
+        if len(above_thresh) >=10:
+            cent_of_maxes = np.mean(above_thresh)
+            self.linearSpeed = 4.0
+            self.good_signal = True
+            self.close_eyes_and_turn_right_state = False
+        else: 
+            self.good_signal = False
+            
+            # one shot state transition the first time we lose a good hall following signal
+            if not self.close_eyes_and_go_straight_state and not self.close_eyes_and_turn_right_state:
+				self.close_eyes_and_go_straight_state = True 
+				
+            elif self.close_eyes_and_go_straight_state:
+                if lastScanNP[0] - self.old_right_side_scans > 0.3:
+					self.close_eyes_and_go_straight_state = False
+					self.close_eyes_and_turn_right_state = True
+            
+            cent_of_maxes = 50
+            
+        self.old_right_side_scans = right_side_scans
+            
+        translation_err = (cent_of_maxes - 50)
+        
+        u_p = self.FSM_K_p * translation_err
+
+        if self.good_signal:
+            auto_steer = u_p # + u_i + u_d
+            self.steerAngle = auto_steer
+            print('In State 1 (hall follow) ','translation error:' , translation_err , 'steer:' , round(self.steerAngle,5))
+        else: 
+			if self.close_eyes_and_go_straight_state:
+				self.steerAngle = self.steerAngle # do nothing
+				print('In State 2 (go straight till turn) ',round(lastScanNP[0] - self.old_right_side_scans,5))
+			if self.close_eyes_and_turn_right_state:
+				self.steerAngle = -0.1
+				print('In State 3 (turn till good hall signal found) ')
+        
         
     def run( self ):
         """ Take a laser reading and generate a control signal """
@@ -227,8 +296,9 @@ class CarFSM:
             if 0:
                 self.drive_pub.publish(  compose_ack_ctrl_msg( pi/8 , 2.0 )  )
                 
-            # 2. Generate a control effort
-            self.wall_follow_state()
+            # 2. Generate a control effort -- should probably have a method for switching between control methods that's better than commenting
+            # self.wall_follow_state() 
+            self.hallway_FSM()
             
             # 3. Transmit the control effort
             if 1:
