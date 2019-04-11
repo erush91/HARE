@@ -102,7 +102,9 @@ class CarFSM:
         # 3. Start subscribers and listeners
         rospy.Subscriber( "/scan" , LaserScan , self.scan_cb )
         self.numReadings = 100
-        self.lastScan = [ 0 for i in range( self.numReadings ) ]
+	self.scanCenter  = int(self.numReadings//2)
+        self.lastScan = [ 0.0 for i in range( self.numReadings ) ]
+	self.lastScanNP = np.asarray( self.lastScan )
         self.num_right_scans = 5
         self.old_right_side_scans = np.ones((self.num_right_scans))*20
         
@@ -133,8 +135,9 @@ class CarFSM:
         self.nearN           = 30 # Count this many points as near the average
         self.slope_window    = 10 # Look this many points in the past to compute slope
 	
+	# 7. FSM Vars
+	self.set_FSM_vars()
 	
-        
         # ~ PID ~
         self.K_d = 0.0080
         self.K_i = 0.00000
@@ -153,42 +156,90 @@ class CarFSM:
         # print "Scan Min:" , min( self.lastScan ) , ", Scan Max:" , max( self.lastScan )
         self.lastScan = msg.intensities # Do I need to copy this?
         
+        
     # === DRIVE FINITE STATE MACHINE =======================================================================================================
         
     def set_FSM_vars( self ):
 	""" Set the variables necessary for the FSM controller """
 	# 7. FSM Vars
-	self.state           = self.STATE_forward # Currently-active state, the actual function
+	self.state           = self.STATE_init # -- Currently-active state, the actual function
 	self.max_thresh_dist =  9.0 # ------------- Above this value we consider distance to be maxed out
 	self.thresh_count    = 10 # --------------- If there are at least this many readings above 'self.max_thresh_dist' 
 	self.straight_speed  =  4.0 # ------------- Speed for 'STATE_forward'	
+	self.FLAG_goodScan   = False # ------------ Was the last scan appropriate for straight-line driving
+        
+    def eval_scan( self ):
+	""" Populate the threshold array and return its center """
+	self.lastScanNP = np.asarray( self.lastScan )
+	self.above_thresh = np.where( lastScanNP > self.max_thresh_dist )[0]
+	return np.mean( self.above_thresh )
         
     def p_good_scan( self ):
 	""" Predicate: Was the latest scan a good scan? """
-	lastScanNP   = np.asarray( self.lastScan )
-	above_thresh = np.where( lastScanNP > self.max_thresh_dist )[0]	
 	if len( above_thresh ) >= self.thresh_count:
-	    cent_of_maxes = np.mean( above_thresh )
-	    self.linearSpeed = 4.0
-	    self.good_signal = True
-	    self.close_eyes_and_turn_right_state = False
 	    return True
 	else: 
-	    self.good_signal = False	
 	    return False
     
     """
     STATE_funcname
-    # ~   I. State Actions   ~
+    # ~   I. State Calcs   ~
     # ~  II. Set controls  ~
     # ~ III. Transition Determination ~
+    # ~  IV. Clean / Update ~
     """
     
+    def STATE_init( self ):
+	""" Initial state , Determine the drving mode """
+	
+	# ~   I. State Calcs   ~
+	self.FLAG_goodScan = self.p_good_scan() # Assess straight-line driving
+	
+	# ~  II. Set controls  ~
+	self.steerAngle  = 0.0
+	self.linearSpeed = 0.0	
+	
+	# ~ III. Transition Determination ~	
+	# NOTE: At the moment, safest transition is probably to wait for the first straightaway
+	# A. If there is a good straightaway scan, then set the forward state
+	if self.FLAG_goodScan:
+	    self.state = self.STATE_forward
+	# B. Otherwise, wait for a good hallway scan (This way we can troubleshoot just by wathcing wheel motion)
+	else:
+	    self.state = self.STATE_init
+	    
+	# ~  IV. Clean / Update ~
+	# NONE
+    
     def STATE_forward( self ):
-	""" Straightaway driving """
-	# ~   I. State Actions   ~
+	""" Straightaway driving , Monitor for turn or fault """
+	
+	# ~   I. State Calcs   ~
+	# 1. Calculate and store error
+	right_side_scans = np.mean( lastScanNP[ 0:self.num_right_scans ] )	
+	
+	# ~  II. Set controls  ~
+	cent_of_maxes   = self.eval_scan()
+	translation_err = cent_of_maxes * 1.0 - self.scanCenter
+	u_p             = self.FSM_K_p * translation_err	
+	auto_steer      = u_p # + u_i + u_d # NOTE: P-ctrl only for demo
+	self.steerAngle = auto_steer	
+	
+	# ~ III. Transition Determination ~
+	if lastScanNP[0] - self.old_right_side_scans > 0.3:
+	    self.state = self.STATE_blind_rght_turn
+	else:
+	    self.state = self.STATE_forward
+	
+	# ~  IV. Clean / Update ~
+	self.old_right_side_scans = right_side_scans
+       
+    def STATE_blind_rght_turn( self ):
+	"""  """
+	# ~   I. State Calcs   ~
 	# ~  II. Set controls  ~
 	# ~ III. Transition Determination ~
+	# ~  IV. Clean / Update ~	
         
     def hallway_FSM( self ):
         """ State 1 - Steer at the center of the patch of max distances 
@@ -206,10 +257,7 @@ class CarFSM:
         transition, camera maxes are once again found and State 1 is reentered
         """
         
-        # 1. Calculate and store error
-        lastScanNP = np.asarray(self.lastScan)
-
-        right_side_scans = np.mean(lastScanNP[0:self.num_right_scans])
+        
 		# this sets the state transition flag based on "good signal"
         
             
@@ -218,21 +266,18 @@ class CarFSM:
 				self.close_eyes_and_go_straight_state = True 
 				
             elif self.close_eyes_and_go_straight_state:
-                if lastScanNP[0] - self.old_right_side_scans > 0.3:
+                
 					self.close_eyes_and_go_straight_state = False
 					self.close_eyes_and_turn_right_state = True
             
             cent_of_maxes = 50
             
-        self.old_right_side_scans = right_side_scans
-            
-        translation_err = (cent_of_maxes - 50)
         
-        u_p = self.FSM_K_p * translation_err
+            
+        
 
         if self.good_signal:
-            auto_steer = u_p # + u_i + u_d
-            self.steerAngle = auto_steer
+            
             print('In State 1 (hall follow) ','translation error:' , translation_err , 'steer:' , round(self.steerAngle,5))
         else: 
 	    if self.close_eyes_and_go_straight_state:
