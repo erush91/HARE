@@ -1,0 +1,29 @@
+Getting a bat network setup should be fairly simple.
+
+First, make sure you have batman-adv installed
+>> dmesg | grep "batman"
+If nothing shows up, you need to run:
+>> sudo modprobe batman-adv
+
+Make sure you have batctl installed:
+>> sudo apt install batctl
+
+Once these things are done, you just need to configure the setup script:
+- Make sure the IP address you set as ARG1 is different for each device.
+- Hard code the devID (line 34), you can use iwconfig to get your wifi device ID (should be something like "wlx..."
+
+Now run the setup script TWICE
+>> sudo ./HAREsetupScript.sh 
+>> sudo ./HAREsetupScript.sh 
+
+
+The bat network should be ready to go on this device. Now repeat the same process for the other device. Once both devices are on the network, you can run
+>> sudo batctl n
+to see if you have any neighbors on the network (you should see one neighbor if everything has been set up properly to this point).
+
+Now you can try to ping each device by their IP address as one would normally. If you can ping both ways, you should be good to go to ssh and begin remote control of the vehicle!
+
+Cheers.
+
+
+

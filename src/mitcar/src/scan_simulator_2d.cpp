@@ -35,10 +35,18 @@ ScanSimulator2D::ScanSimulator2D(
   noise_dist = std::normal_distribution<double>( 0.0 , scan_std_dev );
 }
 
+<<<<<<< HEAD
 double saturate_to_zero( double input , double loBound , double hiBound ){
     // Return 0 if the 'input' is out of bounds, Otherwise return the 'input'
     if( input < loBound )  return 0.0;
     if( input > hiBound )  return 0.0;
+=======
+double RS_saturation( double input , double loBound , double hiBound ){
+    // Return 0 if the 'input' is out of bounds, Otherwise return the 'input'
+    if( input < loBound )  return 0.0;
+    // if( input > hiBound )  return 0.0;
+    if( input > hiBound )  return hiBound;
+>>>>>>> master
     return input;
 }
 
@@ -61,7 +69,11 @@ const std::vector<double> ScanSimulator2D::scan( const Pose2D& pose ){
     distance += noise_dist(noise_generator);
 
     // Add the distance to the output
+<<<<<<< HEAD
     scan_output[i] = saturate_to_zero( distance , dist_min , dist_max );
+=======
+    scan_output[i] = RS_saturation( distance , dist_min , dist_max );
+>>>>>>> master
 
     // Increment the scan
     beam_pose.theta += angle_increment;

@@ -17,7 +17,12 @@ scan_min_depth:  0.2 # > value --> Set to 0.0 , [m]
 scan_max_depth: 10.0 # < value --> Set to 0.0 , [m] 
 
 # Z-rotation of the sensor to optimize wall-following
+<<<<<<< HEAD
 scan_mount_angle_offset: -0.785 # radians # 45deg to the right
+=======
+# scan_mount_angle_offset: -0.785 # radians # 45deg to the right
+scan_mount_angle_offset: 0.0 # radians # straight ahead
+>>>>>>> master
 
 # The distance from the center of the
 # rear axis (base_link) to the lidar
