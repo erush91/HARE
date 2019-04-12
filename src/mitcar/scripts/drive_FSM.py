@@ -129,8 +129,8 @@ class CarFSM:
         self.nearN           = 30 # Count this many points as near the average
         self.slope_window    = 10 # Look this many points in the past to compute slope
 	
-	# 7. FSM Vars
-	self.set_FSM_vars()
+	    # 7. FSM Vars
+	    self.set_FSM_vars()
 	
         # ~ PID ~
         self.K_d = 0.0080

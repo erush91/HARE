@@ -163,7 +163,10 @@ class CarFSM:
         self.angleDiffMin   = rospy.get_param( "ANGLE_DIFF_MIN" ) # limits micro commands
         self.linearSpeed    = rospy.get_param( "LINEAR_SPEED"   ) # [ -1 ,  1 ]
         
-        # 7. Test vars
+        # 7. FSM Vars
+        self.set_FSM_vars()
+
+        # 8. Test vars
         self.t_test = 0.0
         self.t_incr = 0.025
         self.t_curr = 0.0
@@ -340,7 +343,7 @@ class CarFSM:
         """ Check to see if the new steering angle is large enough to warrant a command this prevents micro commands to the servo
             True  : There is a sufficiently different command to publish
             False : Microcommand, do not publish """
-        if  ( np.abs( self.steerAngle - self.prevSteerAngle ) > self.angleDiffMin )  or  ( not eq( self.linearSpeed , self.prevLinarSpeed ) ):
+        if  ( np.abs( self.steerAngle - self.prevSteerAngle ) > self.angleDiffMin )  or  ( not eq_margin( self.linearSpeed , self.prevLinarSpeed ) ):
             self.prevSteerAngle = self.steerAngle
             self.prevLinarSpeed = self.linearSpeed
             self.FLAG_newCtrl   = True
