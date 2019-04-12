@@ -152,12 +152,14 @@ class CarFSM:
         self.nearN           = 30 # Count this many points as near the average
         self.slope_window    = 10 # Look this many points in the past to compute slope
         # ~ PID ~
-        self.K_d = rospy.get_param("D_VALUE")
-        self.K_i = rospy.get_param("I_VALUE")
-        self.K_p = rospy.get_param("P_VALUE")
+        self.K_d = rospy.get_param( "D_VALUE" )
+        self.K_i = rospy.get_param( "I_VALUE" )
+        self.K_p = rospy.get_param( "P_VALUE" )
         # ~ Control Output ~
+        self.FLAG_newCtrl   = False # Flag for whether we accept the new control signal
         self.steerAngle     = 0.0
         self.prevSteerAngle = 0.0
+        self.prevLinarSpeed = 0.0
         self.angleDiffMin   = rospy.get_param( "ANGLE_DIFF_MIN" ) # limits micro commands
         self.linearSpeed    = rospy.get_param( "LINEAR_SPEED"   ) # [ -1 ,  1 ]
         
@@ -167,6 +169,235 @@ class CarFSM:
         self.t_curr = 0.0
         self.t_last = rospy.Time.now().to_sec()
         self.Tstate = 0
+    
+        
+    def scan_cb( self , msg ):
+        """ Process the scan that comes back from the scanner """
+        # NOTE: Scan progresses from least theta to most theta: CCW
+        # print "Got a scanner message with" , len( msg.intensities ) , "readings!"
+        # ~ print "Scan:" , self.lastScan
+        # print "Scan Min:" , min( self.lastScan ) , ", Scan Max:" , max( self.lastScan )
+        if 0: # DIRTY HACK
+            self.lastScan = [ elem/25.50 for elem in msg.data ] # scale [0,255] to [0,10]
+        else:
+            self.lastScan = msg.data
+            
+    
+    # === DRIVE FINITE STATE MACHINE =======================================================================================================
+        
+    def set_FSM_vars( self ):
+        """ Set the variables necessary for the FSM controller """
+        
+        # ~ FSM Vars ~
+        self.state           = self.STATE_init # -- Currently-active state, the actual function
+        self.max_thresh_dist =  9.0 # ------------- Above this value we consider distance to be maxed out
+        self.thresh_count    = 10 # --------------- If there are at least this many readings above 'self.max_thresh_dist' 
+        self.FLAG_goodScan   = False # ------------ Was the last scan appropriate for straight-line driving
+        
+        # ~ State-Specific Constants ~
+        self.straight_speed = 0.09 # Speed for 'STATE_forward'	
+        self.turning_speed  = 0.08 # Speed for 'STATE_blind_rght_turn'
+        self.turning_angle  = 0.10 # Turn angle for 'STATE_blind_rght_turn'
+            
+    def eval_scan( self ):
+        """ Populate the threshold array and return its center """
+        SHOWDEBUG = 0
+        # 1. Determine which scan values are above the threshold
+        self.lastScanNP = np.asarray( self.lastScan )
+        self.above_thresh = np.where( self.lastScanNP > self.max_thresh_dist )[0]
+        # 2. Predicate: Was the latest scan a good scan?
+        if len( self.above_thresh ) >= self.thresh_count:
+            self.FLAG_goodScan = True
+        else: 
+            self.FLAG_goodScan = False	
+        if SHOWDEBUG:
+            print "Scan: ___________" , self.lastScan
+            print "Scan np: ________" , self.lastScanNP
+            print "Threshold Arr: __" , self.above_thresh
+            print "Threshold Center:" , np.mean( self.above_thresh )
+            print "Good Scan: ______" , ( "YES" if self.FLAG_goodScan else "NO" )
+            print
+        # 3. Return the center of the above-threshold values
+        return np.mean( self.above_thresh )
+        
+    """
+    STATE_funcname
+    # ~   I. State Calcs   ~
+    # ~  II. Set controls  ~
+    # ~ III. Transition Determination ~
+    # ~  IV. Clean / Update ~
+    """
+    
+    def STATE_init( self ):
+        """ Initial state , Determine the drving mode """
+        
+        SHOWDEBUG = 1
+        if SHOWDEBUG:
+            print "STATE_init"
+        
+        # ~   I. State Calcs   ~
+        self.eval_scan() # Assess straight-line driving
+        
+        # ~  II. Set controls  ~
+        self.steerAngle  = 0.0
+        self.linearSpeed = 0.0	
+        
+        # ~ III. Transition Determination ~	
+        # NOTE: At the moment, safest transition is probably to wait for the first straightaway
+        # A. If there is a good straightaway scan, then set the forward state
+        if self.FLAG_goodScan:
+            self.state = self.STATE_forward
+        # B. Otherwise, wait for a good hallway scan (This way we can troubleshoot just by wathcing wheel motion)
+        else:
+            self.state = self.STATE_init
+            
+        # ~  IV. Clean / Update ~
+        # NONE
+    
+    def STATE_forward( self ):
+        """ Straightaway driving , Monitor for turn or fault """
+        
+        SHOWDEBUG = 1
+        if SHOWDEBUG:
+            print "STATE_forward"	
+        
+        # ~   I. State Calcs   ~
+        # 1. Calculate and store error
+        cent_of_maxes = self.eval_scan()
+        
+        # right_mean    = np.mean( self.lastScanNP[ 0:self.num_right_scans ] )	
+        right_mean    = np.mean( self.lastScanNP[ self.num_right_scans: ] )	# NOTE: Scan is CW on the RealSense
+        
+        # ~  II. Set controls  ~
+        if self.FLAG_goodScan:
+            translation_err  = cent_of_maxes * 1.0 - self.scanCenter
+            u_p              = self.FSM_K_p * translation_err	
+            auto_steer       = u_p # + u_i + u_d # NOTE: P-ctrl only for demo
+            
+            # Control Effort
+            
+            # self.steerAngle  = auto_steer	
+            self.steerAngle  = -auto_steer	
+            
+            self.linearSpeed = self.straight_speed
+        
+        # ~ III. Transition Determination ~
+        # if 0.3 < ( float( self.lastScanNP[0] ) - self.old_right_mean ):
+        if 0.3 < ( float( self.lastScanNP[-1] ) - self.old_right_mean ): # NOTE: Scan is CW on the RealSense
+            self.state = self.STATE_blind_rght_turn
+        else:
+            self.state = self.STATE_forward
+        
+        # ~  IV. Clean / Update ~
+        self.old_right_mean = right_mean
+           
+           
+        def STATE_blind_rght_turn( self ):
+            """ Turn right at a preset radius until a clear straightaway signal is present """
+            
+            SHOWDEBUG = 1
+            if SHOWDEBUG:
+                print "STATE_blind_rght_turn"
+            
+            # ~   I. State Calcs   ~
+            self.eval_scan() # Assess straight-line driving	
+            
+            # ~  II. Set controls  ~
+            self.linearSpeed = self.turning_speed
+            self.steerAngle  = self.turning_angle	
+            
+            # ~ III. Transition Determination ~
+            if self.FLAG_goodScan:
+                self.state = self.STATE_forward
+            else:
+                self.state = self.STATE_blind_rght_turn
+            
+            # ~  IV. Clean / Update ~
+            # NONE
+        
+    def hallway_FSM( self ):
+        """ State 1 - Steer at the center of the patch of max distances 
+        
+        transition, not enough scan entries greater than a set threshold that is near the camera max
+        
+        State 2 - Drive straight (maybe add some deceleration here), note this only works if our control coming
+        into this state is relatively straight and stable
+        
+        transition, looking at the right side of the scan data, a large change indicates beam passed off the
+        corner so the turn should begin
+        
+        State 3 - Drive with a set right hand turn angle 
+        
+        transition, camera maxes are once again found and State 1 is reentered
+        """
+	
+        # NOTE: Each state must handle its own data collection, processing, control setting, and transition
+        self.state()
+        
+    # ___ END FSM __________________________________________________________________________________________________________________________
+        
+    def dampen_micro_cmds( self ):
+        """ Check to see if the new steering angle is large enough to warrant a command this prevents micro commands to the servo
+            True  : There is a sufficiently different command to publish
+            False : Microcommand, do not publish """
+        if  ( np.abs( self.steerAngle - self.prevSteerAngle ) > self.angleDiffMin )  or  ( not eq( self.linearSpeed , self.prevLinarSpeed ) ):
+            self.prevSteerAngle = self.steerAngle
+            self.prevLinarSpeed = self.linearSpeed
+            self.FLAG_newCtrl   = True
+        else:
+            self.FLAG_newCtrl = False
+            
+    def run( self ):
+        """ Take a distance reading and generate a control signal """
+        
+        # 1. While ROS is running
+        while ( not rospy.is_shutdown() ):
+            
+            # 1. Calculate a control effort
+            
+            # A. Drive Test
+            if 0:
+                self.drive_pub.publish(  compose_ack_ctrl_msg( pi/8 , 2.0 )  )
+                
+            # B. Generate a control effort
+            sendCommand = True
+            if 1:
+                self.hallway_FSM()
+            elif 0:
+                sendCommand = self.wall_follow_state()
+            else:
+                self.test_state()
+            
+            # 2. Transmit the control effort
+            if self.FLAG_newCtrl:
+                #print( "Steering Angle:" , self.steerAngle , ", Speed:" , self.linearSpeed )
+                self.drive_pub.publish(  compose_HARE_ctrl_msg( self.steerAngle , self.linearSpeed )  )
+            
+            # N-1: Wait until the node is supposed to fire next
+            self.idle.sleep()        
+        
+        # N. Post-shutdown activities
+        else:
+            print "Node Shutdown after" , rospy.Time.now().to_sec() - self.initTime , "seconds"
+        
+        
+    def test_state( self ):
+        """ Run the drive motor forwards and backwards while performing a sine sweep on the steering angle """
+        # 1. Set the steering angle
+        self.t_curr += self.t_incr
+        self.steerAngle = pi/4 * sin( self.t_curr )
+        # 2. Set the throttle
+        if 1:
+            self.linearSpeed = 0.0
+        else:
+            self.t_curr = rospy.Time.now().to_sec()
+            # A. If more than 1 second has passed since the last transition, advance to the next speed state
+            if self.t_curr - self.t_last > 1.0:
+                self.Tstate = ( self.Tstate + 1 ) % len( _STATETRANS )
+                self.linearSpeed = _STATETRANS[ self.Tstate ]
+                self.t_last = self.t_curr
+        
+    # === OLD PID CODE =====================================================================================================================
         
     def near_avg( self ):
         """ Average of the nearest points """
@@ -184,33 +415,6 @@ class CarFSM:
                 return totNonZ / numNonZ
             else:
                 return 0.0    
-        
-    def scan_cb( self , msg ):
-        """ Process the scan that comes back from the scanner """
-        # NOTE: Scan progresses from least theta to most theta: CCW
-        # print "Got a scanner message with" , len( msg.intensities ) , "readings!"
-        # ~ print "Scan:" , self.lastScan
-        # print "Scan Min:" , min( self.lastScan ) , ", Scan Max:" , max( self.lastScan )
-        if 0: # DIRTY HACK
-            self.lastScan = [ elem/25.50 for elem in msg.data ] # scale [0,255] to [0,10]
-        else:
-            self.lastScan = msg.data
-        
-    def test_state( self ):
-        """ Run the drive motor forwards and backwards while performing a sine sweep on the steering angle """
-        # 1. Set the steering angle
-        self.t_curr += self.t_incr
-        self.steerAngle = pi/4 * sin( self.t_curr )
-        # 2. Set the throttle
-        if 1:
-            self.linearSpeed = 0.0
-        else:
-            self.t_curr = rospy.Time.now().to_sec()
-            # A. If more than 1 second has passed since the last transition, advance to the next speed state
-            if self.t_curr - self.t_last > 1.0:
-                self.Tstate = ( self.Tstate + 1 ) % len( _STATETRANS )
-                self.linearSpeed = _STATETRANS[ self.Tstate ]
-                self.t_last = self.t_curr
         
     def integrate_err( self ):
         """ Rectangular integration of error over time """
@@ -270,47 +474,9 @@ class CarFSM:
         # 4. Calculate control effort
         auto_steer = u_p + u_i + u_d
 
-        # 5. Check to see if the new steering angle is large enough to warrant a command this prevents micro commands to the servo
-        #    True  : There is a sufficiently different command to publish
-        #    False : Microcommand, do not publish
-        if np.abs( auto_steer - self.prevSteerAngle ) > self.angleDiffMin:
-            self.prevSteerAngle = self.steerAngle
-            self.steerAngle = -auto_steer
-            return True
-        else:
-            return False
         
-    def run( self ):
-        """ Take a distance reading and generate a control signal """
-        
-        # 1. While ROS is running
-        while ( not rospy.is_shutdown() ):
-            
-            # 1. Calculate a control effort
-            
-            # A. Drive Test
-            if 0:
-                self.drive_pub.publish(  compose_ack_ctrl_msg( pi/8 , 2.0 )  )
-                
-            # B. Generate a control effort
-            sendCommand = True
-            if 1:
-                sendCommand = self.wall_follow_state()
-            else:
-                self.test_state()
-            
-            # 2. Transmit the control effort
-            if sendCommand:
-                #print( "Steering Angle:" , self.steerAngle , ", Speed:" , self.linearSpeed )
-                self.drive_pub.publish(  compose_HARE_ctrl_msg( self.steerAngle , self.linearSpeed )  )
-            
-            # N-1: Wait until the node is supposed to fire next
-            self.idle.sleep()        
-        
-        # N. Post-shutdown activities
-        else:
-            print "Node Shutdown after" , rospy.Time.now().to_sec() - self.initTime , "seconds"
-        
+
+    # ___ END PID __________________________________________________________________________________________________________________________
 
 # __ End Class __
 
