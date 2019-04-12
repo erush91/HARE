@@ -21,5 +21,9 @@
     <param name="I_VALUE" type="double" value="0.0000"/>
     <param name="D_VALUE" type="double" value="0.0000"/>
     <node name="CarFSM" pkg="plan_ctrl" type="simple_PID_on_wall.py" output="screen" />
+
+    <!-- Start Recording , URL: https://answers.ros.org/question/52773/record-with-rosbag-from-launch-file/?answer=52856#post-id-52856 -->
+    <node pkg="rosbag" type="record" name="rosbag_record_hall"
+          args="record -O /rosout /HARE_high_level_command /filtered_distance /pololu/command /pololu/motor_states"/>  
     
 </launch>

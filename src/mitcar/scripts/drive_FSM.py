@@ -102,9 +102,9 @@ class CarFSM:
         # 3. Start subscribers and listeners
         rospy.Subscriber( "/scan" , LaserScan , self.scan_cb )
         self.numReadings = 100
-	self.scanCenter  = int(self.numReadings//2)
+        self.scanCenter  = int(self.numReadings//2)
         self.lastScan = [ 0.0 for i in range( self.numReadings ) ]
-	self.lastScanNP = np.asarray( self.lastScan )
+        self.lastScanNP = np.asarray( self.lastScan )
         self.num_right_scans = 5
         self.old_right_mean  = 0.0 # np.ones((self.num_right_scans))*20
         
@@ -128,9 +128,9 @@ class CarFSM:
         self.wallSetPnt      =  3.0 # [m]
         self.nearN           = 30 # Count this many points as near the average
         self.slope_window    = 10 # Look this many points in the past to compute slope
-	
-	    # 7. FSM Vars
-	    self.set_FSM_vars()
+
+        # 7. FSM Vars
+        self.set_FSM_vars()
 	
         # ~ PID ~
         self.K_d = 0.0080

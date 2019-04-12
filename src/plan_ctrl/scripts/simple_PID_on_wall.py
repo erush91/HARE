@@ -129,7 +129,11 @@ class CarFSM:
         # 3. Start subscribers and listeners
         rospy.Subscriber( "/filtered_distance" , Float32MultiArray , self.scan_cb )
         self.numReadings = 100
-        self.lastScan = [ 0 for i in range( self.numReadings ) ]
+        self.scanCenter  = int(self.numReadings//2)
+        self.lastScan = [ 0.0 for i in range( self.numReadings ) ]
+        self.lastScanNP = np.asarray( self.lastScan )
+        self.num_right_scans = 5
+        self.old_right_mean  = 0.0 # np.ones((self.num_right_scans))*20
         
         # 4. Start publishers
         try:
@@ -198,7 +202,7 @@ class CarFSM:
         self.FLAG_goodScan   = False # ------------ Was the last scan appropriate for straight-line driving
         
         # ~ State-Specific Constants ~
-        self.straight_speed = 0.09 # Speed for 'STATE_forward'	
+        self.straight_speed = 0.085 # Speed for 'STATE_forward'	
         self.turning_speed  = 0.08 # Speed for 'STATE_blind_rght_turn'
         self.turning_angle  = 0.10 # Turn angle for 'STATE_blind_rght_turn'
             
