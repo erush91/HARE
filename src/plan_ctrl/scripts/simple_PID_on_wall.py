@@ -363,6 +363,7 @@ class CarFSM:
             sendCommand = True
             if 1:
                 self.hallway_FSM()
+                self.dampen_micro_cmds()
             elif 0:
                 sendCommand = self.wall_follow_state()
             else:
