@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 numReadings = 100
 lastScan = [ 0 for i in range( numReadings ) ]
 
-RunningOdroid = False
+RunningOdroid = 1
 
 
 def scan_cb( msg ):
