@@ -197,8 +197,8 @@ class CarFSM:
         
         # ~ FSM Vars ~
         self.state           = self.STATE_init # -- Currently-active state, the actual function
-        self.max_thresh_dist =  9.0 # ------------- Above this value we consider distance to be maxed out [m]
-        self.thresh_count    = 10 # --------------- If there are at least this many readings above 'self.max_thresh_dist' 
+        self.max_thresh_dist =  8.0 # ------------- Above this value we consider distance to be maxed out [m]
+        self.thresh_count    = 5 # --------------- If there are at least this many readings above 'self.max_thresh_dist' 
         self.FLAG_goodScan   = False # ------------ Was the last scan appropriate for straight-line driving
         self.crnr_drop_dist  = 0.65 # ------------- Increase in distance of the rightmost reading that will cause transition to the turn state
         self.reason          = "INIT" # ----------- Y U change state?
