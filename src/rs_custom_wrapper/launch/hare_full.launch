@@ -17,7 +17,10 @@
     <!-- Start Planner -->
     <param name="LINEAR_SPEED" type="double" value="0.08"/>
     <param name="ANGLE_DIFF_MIN" type="double" value="0.0"/>
-    <param name="P_VALUE" type="double" value="1.0000"/>
+    
+    <!-- param name="P_VALUE" type="double" value="1.0000"/ -->
+    <param name="P_VALUE" type="double" value="0.1000"/>
+    
     <param name="I_VALUE" type="double" value="0.0000"/>
     <param name="D_VALUE" type="double" value="0.0000"/>
     <node name="CarFSM" pkg="plan_ctrl" type="simple_PID_on_wall.py" output="screen" />

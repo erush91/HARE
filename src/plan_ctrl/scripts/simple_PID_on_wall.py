@@ -276,16 +276,15 @@ class CarFSM:
         right_mean    = np.mean( self.lastScanNP[ self.num_right_scans: ] )	# NOTE: Scan is CW on the RealSense
         
         # ~  II. Set controls  ~
+        # Calc a new forward effort only if there is a good hallway scan
         if self.FLAG_goodScan:
             translation_err  = cent_of_maxes * 1.0 - self.scanCenter
-            u_p              = self.FSM_K_p * translation_err	
+            u_p              = self.K_p * translation_err	
             auto_steer       = u_p # + u_i + u_d # NOTE: P-ctrl only for demo
             
             # Control Effort
-            
             # self.steerAngle  = auto_steer	
             self.steerAngle  = -auto_steer	
-            
             self.linearSpeed = self.straight_speed
         
         # ~ III. Transition Determination ~
@@ -361,19 +360,12 @@ class CarFSM:
         while ( not rospy.is_shutdown() ):
             
             # 1. Calculate a control effort
-            
-            # A. Drive Test
-            if 0:
-                self.drive_pub.publish(  compose_ack_ctrl_msg( pi/8 , 2.0 )  )
-                
-            # B. Generate a control effort
-            sendCommand = True
-            if 1:
+            if 1: # Enable Finite State Machine
                 self.hallway_FSM()
                 self.dampen_micro_cmds()
-            elif 0:
+            elif 0: # Enable PID control
                 sendCommand = self.wall_follow_state()
-            else:
+            else: # Enable test - Unchanging open loop command
                 self.test_state()
             
             # 2. Transmit the control effort
