@@ -52,3 +52,9 @@ cmake-build-debug/
 .catkin_tools/
 logs/
 src/mitcar_bkup/
+halltest01_2019-04-12-13-49-06.bag
+src/mitcar/scripts/halltest02_2019-04-12-14-00-36.bag
+*/*/*.bag
+*/*.bag
+halltest03_2019-04-12-14-07-31.bag
+imgui.ini

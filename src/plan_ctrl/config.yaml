@@ -3,7 +3,7 @@
 # ~~ Filter Config ~~
 numpoints: 100
 scanlines:   3
-scan_rows: [ 310 , 260 , 210 ]
+scan_rows: [ 150 , 125 , 100 ]
 imagewdth: 640
 imagehght: 360
 
