@@ -200,9 +200,10 @@ class CarFSM:
         self.max_thresh_dist =  9.0 # ------------- Above this value we consider distance to be maxed out
         self.thresh_count    = 10 # --------------- If there are at least this many readings above 'self.max_thresh_dist' 
         self.FLAG_goodScan   = False # ------------ Was the last scan appropriate for straight-line driving
+        self.crnr_drop_dist  = 0.8 # -------------- Increase in distance of the rightmost readting that will cause transition to the turn state
         
         # ~ State-Specific Constants ~
-        self.straight_speed = 0.085 # Speed for 'STATE_forward'	
+        self.straight_speed = 0.08 # Speed for 'STATE_forward'	
         self.turning_speed  = 0.08 # Speed for 'STATE_blind_rght_turn'
         self.turning_angle  = 0.10 # Turn angle for 'STATE_blind_rght_turn'
             
@@ -283,13 +284,14 @@ class CarFSM:
             auto_steer       = u_p # + u_i + u_d # NOTE: P-ctrl only for demo
             
             # Control Effort
-            # self.steerAngle  = auto_steer	
-            self.steerAngle  = -auto_steer	
+            self.steerAngle  = auto_steer	
+            # self.steerAngle  = -auto_steer	
             self.linearSpeed = self.straight_speed
         
         # ~ III. Transition Determination ~
         # if 0.3 < ( float( self.lastScanNP[0] ) - self.old_right_mean ):
-        if 0.3 < ( float( self.lastScanNP[-1] ) - self.old_right_mean ): # NOTE: Scan is CW on the RealSense
+        if self.crnr_drop_dist < ( float( self.lastScanNP[-1] ) - self.old_right_mean ): # NOTE: Scan is CW on the RealSense
+            # IDEA: Take an average of the rightmost readings instead of operating on one only
             self.state = self.STATE_blind_rght_turn
         else:
             self.state = self.STATE_forward
@@ -298,28 +300,28 @@ class CarFSM:
         self.old_right_mean = right_mean
            
            
-        def STATE_blind_rght_turn( self ):
-            """ Turn right at a preset radius until a clear straightaway signal is present """
-            
-            SHOWDEBUG = 1
-            if SHOWDEBUG:
-                print "STATE_blind_rght_turn"
-            
-            # ~   I. State Calcs   ~
-            self.eval_scan() # Assess straight-line driving	
-            
-            # ~  II. Set controls  ~
-            self.linearSpeed = self.turning_speed
-            self.steerAngle  = self.turning_angle	
-            
-            # ~ III. Transition Determination ~
-            if self.FLAG_goodScan:
-                self.state = self.STATE_forward
-            else:
-                self.state = self.STATE_blind_rght_turn
-            
-            # ~  IV. Clean / Update ~
-            # NONE
+    def STATE_blind_rght_turn( self ):
+        """ Turn right at a preset radius until a clear straightaway signal is present """
+        
+        SHOWDEBUG = 1
+        if SHOWDEBUG:
+            print "STATE_blind_rght_turn"
+        
+        # ~   I. State Calcs   ~
+        self.eval_scan() # Assess straight-line driving	
+        
+        # ~  II. Set controls  ~
+        self.linearSpeed = self.turning_speed
+        self.steerAngle  = self.turning_angle	
+        
+        # ~ III. Transition Determination ~
+        if self.FLAG_goodScan:
+            self.state = self.STATE_forward
+        else:
+            self.state = self.STATE_blind_rght_turn
+        
+        # ~  IV. Clean / Update ~
+        # NONE
         
     def hallway_FSM( self ):
         """ State 1 - Steer at the center of the patch of max distances 

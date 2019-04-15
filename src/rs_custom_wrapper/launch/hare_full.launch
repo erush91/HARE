@@ -19,7 +19,7 @@
     <param name="ANGLE_DIFF_MIN" type="double" value="0.0"/>
     
     <!-- param name="P_VALUE" type="double" value="1.0000"/ --> <!-- 'wall_follow_state' controls on "meters" -->
-    <param name="P_VALUE" type="double" value="0.1000"/> <!-- 'hallway_FSM' controls on "indices" -->
+    <param name="P_VALUE" type="double" value="0.0500"/> <!-- 'hallway_FSM' controls on "indices" -->
     
     <param name="I_VALUE" type="double" value="0.0000"/>
     <param name="D_VALUE" type="double" value="0.0000"/>
