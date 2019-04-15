@@ -132,8 +132,8 @@ class CarFSM:
         self.scanCenter  = int(self.numReadings//2)
         self.lastScan = [ 0.0 for i in range( self.numReadings ) ]
         self.lastScanNP = np.asarray( self.lastScan )
-        self.num_right_scans = 5
-        self.old_right_mean  = 0.0 # np.ones((self.num_right_scans))*20
+        self.num_right_scans =  5
+        self.old_right_mean  =  0.0 # np.ones((self.num_right_scans))*20
         
         # 4. Start publishers
         try:
@@ -197,15 +197,16 @@ class CarFSM:
         
         # ~ FSM Vars ~
         self.state           = self.STATE_init # -- Currently-active state, the actual function
-        self.max_thresh_dist =  9.0 # ------------- Above this value we consider distance to be maxed out
+        self.max_thresh_dist =  9.0 # ------------- Above this value we consider distance to be maxed out [m]
         self.thresh_count    = 10 # --------------- If there are at least this many readings above 'self.max_thresh_dist' 
         self.FLAG_goodScan   = False # ------------ Was the last scan appropriate for straight-line driving
-        self.crnr_drop_dist  = 0.8 # -------------- Increase in distance of the rightmost readting that will cause transition to the turn state
+        self.crnr_drop_dist  = 0.65 # ------------- Increase in distance of the rightmost reading that will cause transition to the turn state
+        self.reason          = "INIT" # ----------- Y U change state?
         
         # ~ State-Specific Constants ~
-        self.straight_speed = 0.08 # Speed for 'STATE_forward'	
-        self.turning_speed  = 0.08 # Speed for 'STATE_blind_rght_turn'
-        self.turning_angle  = 0.10 # Turn angle for 'STATE_blind_rght_turn'
+        self.straight_speed =  0.08 # Speed for 'STATE_forward'	
+        self.turning_speed  =  0.08 # Speed for 'STATE_blind_rght_turn'
+        self.turning_angle  =  0.40 # Turn angle for 'STATE_blind_rght_turn'
             
     def eval_scan( self ):
         """ Populate the threshold array and return its center """
@@ -241,7 +242,7 @@ class CarFSM:
         
         SHOWDEBUG = 1
         if SHOWDEBUG:
-            print "STATE_init"
+            print "STATE_init" , self.reason
         
         # ~   I. State Calcs   ~
         self.eval_scan() # Assess straight-line driving
@@ -254,10 +255,12 @@ class CarFSM:
         # NOTE: At the moment, safest transition is probably to wait for the first straightaway
         # A. If there is a good straightaway scan, then set the forward state
         if self.FLAG_goodScan:
-            self.state = self.STATE_forward
+            self.state  = self.STATE_forward
+            self.reason = "GOOD_SCAN"
         # B. Otherwise, wait for a good hallway scan (This way we can troubleshoot just by wathcing wheel motion)
         else:
-            self.state = self.STATE_init
+            self.state  = self.STATE_init
+            self.reason = "BAD_SCAN"
             
         # ~  IV. Clean / Update ~
         # NONE
@@ -267,7 +270,7 @@ class CarFSM:
         
         SHOWDEBUG = 1
         if SHOWDEBUG:
-            print "STATE_forward"	
+            print "STATE_forward" , self.reason
         
         # ~   I. State Calcs   ~
         # 1. Calculate and store error
@@ -287,14 +290,24 @@ class CarFSM:
             self.steerAngle  = auto_steer	
             # self.steerAngle  = -auto_steer	
             self.linearSpeed = self.straight_speed
+            
         
         # ~ III. Transition Determination ~
         # if 0.3 < ( float( self.lastScanNP[0] ) - self.old_right_mean ):
         if self.crnr_drop_dist < ( float( self.lastScanNP[-1] ) - self.old_right_mean ): # NOTE: Scan is CW on the RealSense
+        # if self.crnr_drop_dist < ( right_mean - self.old_right_mean ): # NOTE: Scan is CW on the RealSense
             # IDEA: Take an average of the rightmost readings instead of operating on one only
             self.state = self.STATE_blind_rght_turn
+            self.reason = "CORNER_DROP"
+        # elif not self.FLAG_goodScan: # What happened? Try a turn!
+        #    self.state  = self.STATE_blind_rght_turn
+        #    self.reason = "BAD_SCAN"
         else:
-            self.state = self.STATE_forward
+            self.state  = self.STATE_forward
+            if self.FLAG_goodScan:
+                self.reason = "GOOD_SCAN"
+            else:
+                self.reason = "BAD_SCAN"
         
         # ~  IV. Clean / Update ~
         self.old_right_mean = right_mean
@@ -305,7 +318,7 @@ class CarFSM:
         
         SHOWDEBUG = 1
         if SHOWDEBUG:
-            print "STATE_blind_rght_turn"
+            print "STATE_blind_rght_turn" , self.reason
         
         # ~   I. State Calcs   ~
         self.eval_scan() # Assess straight-line driving	
@@ -316,9 +329,11 @@ class CarFSM:
         
         # ~ III. Transition Determination ~
         if self.FLAG_goodScan:
-            self.state = self.STATE_forward
+            self.state  = self.STATE_forward
+            self.reason = "GOOD_SCAN"
         else:
-            self.state = self.STATE_blind_rght_turn
+            self.state  = self.STATE_blind_rght_turn
+            self.reason = "GOOD_SCAN"
         
         # ~  IV. Clean / Update ~
         # NONE
