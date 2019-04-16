@@ -46,7 +46,7 @@ from geometry_msgs.msg import PoseStamped, Point, Twist
 from ros_pololu_servo.msg import MotorCommand
 from ros_pololu_servo.msg import HARECommand
 # ~ Custom Messages ~
-# from plan_ctrl.msg import CarState
+from plan_ctrl.msg import CarState
 
 # ~~ Local ~~
 from rospy_helpers import ( eq_margin , clamp_val , )
@@ -165,7 +165,7 @@ class CarFSM:
             rospy.logwarn( "CarFSM: Unable to retrieve control topic! , Setting to " + self.driveTopic )
             
         self.drive_pub = rospy.Publisher( 'HARE_high_level_command' , HARECommand , queue_size = 10 )
-#        self.state_pub = rospy.Publisher( 'ctrl_state_report'       , CarState    , queue_size = 10 )
+        self.state_pub = rospy.Publisher( 'ctrl_state_report'       , CarState    , queue_size = 10 )
         
         # 5. Init vars
         self.initTime = rospy.Time.now().to_sec() # Time that the node was started      
@@ -422,7 +422,7 @@ class CarFSM:
         # NOTE: Each state must handle its own data collection, processing, control setting, and transition
         self.state() # ------ State actions and transition
         print self.state.__name__ , ',' , self.reason , ',' , self.steerAngle
-        # self.report_state() # Publish state info
+        self.report_state() # Publish state info
         
     # ___ END FSM __________________________________________________________________________________________________________________________
         
