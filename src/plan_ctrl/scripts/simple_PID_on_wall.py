@@ -45,6 +45,9 @@ from std_msgs.msg import Float32MultiArray
 from geometry_msgs.msg import PoseStamped, Point, Twist
 from ros_pololu_servo.msg import MotorCommand
 from ros_pololu_servo.msg import HARECommand
+# ~ Custom Messages ~
+from plan_ctrl.msg import CarState
+
 # ~~ Local ~~
 from rospy_helpers import ( eq_margin , clamp_val , )
 
@@ -143,6 +146,7 @@ class CarFSM:
             rospy.logwarn( "CarFSM: Unable to retrieve control topic! , Setting to " + self.driveTopic )
             
         self.drive_pub = rospy.Publisher( 'HARE_high_level_command' , HARECommand , queue_size = 10 )
+        self.state_pub = rospy.Publisher( 'ctrl_state_report'       , CarState    , queue_size = 10 )
         
         # 5. Init vars
         self.initTime = rospy.Time.now().to_sec() # Time that the node was started      
@@ -196,12 +200,13 @@ class CarFSM:
         """ Set the variables necessary for the FSM controller """
         
         # ~ FSM Vars ~
-        self.state           = self.STATE_init # -- Currently-active state, the actual function
-        self.max_thresh_dist =  8.0 # ------------- Above this value we consider distance to be maxed out [m]
-        self.thresh_count    = 5 # --------------- If there are at least this many readings above 'self.max_thresh_dist' 
-        self.FLAG_goodScan   = False # ------------ Was the last scan appropriate for straight-line driving
-        self.crnr_drop_dist  = 0.65 # ------------- Increase in distance of the rightmost reading that will cause transition to the turn state
-        self.reason          = "INIT" # ----------- Y U change state?
+        self.state           = self.STATE_init # Currently-active state, the actual function
+        self.seq             =  0 # ------------ Sequence number to give ROS
+        self.max_thresh_dist =  8.0 # ---------- Above this value we consider distance to be maxed out [m]
+        self.thresh_count    =  5 # ------------ If there are at least this many readings above 'self.max_thresh_dist' 
+        self.crnr_drop_dist  =  0.65 # --------- Increase in distance of the rightmost reading that will cause transition to the turn state
+        self.FLAG_goodScan   = False # --------- Was the last scan appropriate for straight-line driving
+        self.reason          = "INIT" # -------- Y U change state?
         
         # ~ State-Specific Constants ~
         self.straight_speed =  0.08 # Speed for 'STATE_forward'	
@@ -228,6 +233,24 @@ class CarFSM:
             print
         # 3. Return the center of the above-threshold values
         return np.mean( self.above_thresh )
+        
+    def report_state( self ):
+        """ Accumulate and publish controller state """
+        # 1. Create msg
+        msg = CarState()
+        # 2. Populate msg
+        self.seq += 1 
+        msg.header.seq      = self.seq # ---------- Sequence number
+        msg.header.stamp    = rospy.get_rostime() # Time info
+        msg.header.frame_id = "car" # ------------- What is it
+        msg.state           = self.state.__name__ # Name of the state
+        msg.reason          = self.reason # ------- Reason for transition
+        msg.FLAG_newCtrl    = self.FLAG_newCtrl # - Was there a new control command issued this timestep?
+        msg.FLAG_goodScan   = self.FLAG_goodScan #- Was there a good scan noted this timestep?
+        msg.steerAngle      = self.steerAngle  # -- Steering angle demanded
+        msg.linearSpeed     = self.linearSpeed  # - Motor speed demanded        
+        # 3. Publish msg
+        self.state_pub.publish( msg )
         
     """
     STATE_funcname
@@ -291,7 +314,6 @@ class CarFSM:
             # self.steerAngle  = -auto_steer	
             self.linearSpeed = self.straight_speed
             
-        
         # ~ III. Transition Determination ~
         # if 0.3 < ( float( self.lastScanNP[0] ) - self.old_right_mean ):
         if self.crnr_drop_dist < ( float( self.lastScanNP[-1] ) - self.old_right_mean ): # NOTE: Scan is CW on the RealSense
@@ -355,7 +377,8 @@ class CarFSM:
         """
 	
         # NOTE: Each state must handle its own data collection, processing, control setting, and transition
-        self.state()
+        self.state() # ------ State actions and transition
+        self.report_state() # Publish state info
         
     # ___ END FSM __________________________________________________________________________________________________________________________
         
