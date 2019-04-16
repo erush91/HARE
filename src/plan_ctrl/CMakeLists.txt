@@ -55,6 +55,13 @@ generate_messages(DEPENDENCIES
 	sensor_msgs
 )
 
+#add_message_files(
+##   DIRECTORY
+#   msg
+##   FILES
+#   CarState.msg
+#   )
+
 #  7. Specify package build info export (catkin_package())
 catkin_package(CATKIN_DEPENDS 
 	# message_generation
