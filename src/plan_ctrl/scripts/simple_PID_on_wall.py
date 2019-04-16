@@ -112,6 +112,25 @@ def eq_margin( op1 , op2 , margin = EPSILON ):
 
 # == Program Classes ==
 
+# = Utility Classes =
+
+class ListRoll( list ):
+    """ Rolling List """
+    
+    def __init__( self , pLength ):
+        """ Create a list with a marker for the current index """
+        list.__init__( self , [ 0 for i in xrange( pLength ) ] )
+        self.length  = pLength
+        self.currDex = 0
+        
+    def add( self , element ):
+        """ Insert the element at the current index and increment index """
+        self[ self.currDex ] = element
+        self.currDex = ( self.currDex + 1 ) % self.length
+        
+# _ End Util _
+
+
 class CarFSM:
     """ A Finite State Machine for autonomous car motion planning """
     
@@ -131,11 +150,11 @@ class CarFSM:
         
         # 3. Start subscribers and listeners
         rospy.Subscriber( "/filtered_distance" , Float32MultiArray , self.scan_cb )
-        self.numReadings = 100
+        self.numReadings = 400
         self.scanCenter  = int(self.numReadings//2)
         self.lastScan = [ 0.0 for i in range( self.numReadings ) ]
         self.lastScanNP = np.asarray( self.lastScan )
-        self.num_right_scans =  5
+        self.num_right_scans =  5*4
         self.old_right_mean  =  0.0 # np.ones((self.num_right_scans))*20
         
         # 4. Start publishers
@@ -203,7 +222,7 @@ class CarFSM:
         self.state           = self.STATE_init # Currently-active state, the actual function
         self.seq             =  0 # ------------ Sequence number to give ROS
         self.max_thresh_dist =  8.0 # ---------- Above this value we consider distance to be maxed out [m]
-        self.thresh_count    =  5 # ------------ If there are at least this many readings above 'self.max_thresh_dist' 
+        self.thresh_count    =  5*3 # ------------ If there are at least this many readings above 'self.max_thresh_dist' 
         self.crnr_drop_dist  =  0.65 # --------- Increase in distance of the rightmost reading that will cause transition to the turn state
         self.FLAG_goodScan   = False # --------- Was the last scan appropriate for straight-line driving
         self.reason          = "INIT" # -------- Y U change state?
@@ -279,11 +298,11 @@ class CarFSM:
         # A. If there is a good straightaway scan, then set the forward state
         if self.FLAG_goodScan:
             self.state  = self.STATE_forward
-            self.reason = "GOOD_SCAN"
+            self.reason = "OVER_THRESH"
         # B. Otherwise, wait for a good hallway scan (This way we can troubleshoot just by wathcing wheel motion)
         else:
             self.state  = self.STATE_init
-            self.reason = "BAD_SCAN"
+            self.reason = "UNDER_THRESH"
             
         # ~  IV. Clean / Update ~
         # NONE
@@ -315,24 +334,48 @@ class CarFSM:
             self.linearSpeed = self.straight_speed
             
         # ~ III. Transition Determination ~
-        # if 0.3 < ( float( self.lastScanNP[0] ) - self.old_right_mean ):
-        if self.crnr_drop_dist < ( float( self.lastScanNP[-1] ) - self.old_right_mean ): # NOTE: Scan is CW on the RealSense
-        # if self.crnr_drop_dist < ( right_mean - self.old_right_mean ): # NOTE: Scan is CW on the RealSense
-            # IDEA: Take an average of the rightmost readings instead of operating on one only
-            self.state = self.STATE_blind_rght_turn
-            self.reason = "CORNER_DROP"
-        # elif not self.FLAG_goodScan: # What happened? Try a turn!
-        #    self.state  = self.STATE_blind_rght_turn
-        #    self.reason = "BAD_SCAN"
-        else:
+        if self.FLAG_goodScan:
             self.state  = self.STATE_forward
-            if self.FLAG_goodScan:
-                self.reason = "GOOD_SCAN"
-            else:
-                self.reason = "BAD_SCAN"
+            self.reason = "OVER_THRESH"
+        else:
+            self.state  = self.STATE_pre_turn
+            self.reason = "UNDER_THRESH"
         
         # ~  IV. Clean / Update ~
         self.old_right_mean = right_mean
+           
+           
+    def STATE_pre_turn( self ):
+        """ Approaching halway end, watch for corner detector """
+        
+        SHOWDEBUG = 1
+        if SHOWDEBUG:
+            print "STATE_pre_turn" , self.reason        
+        
+        # ~   I. State Calcs   ~
+        cent_of_maxes = self.eval_scan()
+        
+        # ~  II. Set controls  ~
+        # SAME AS LAST
+        # IDEA: Possible deceleration phase
+        # IDEA: Possible fail condition a time t --> turn!
+        
+        # ~ III. Transition Determination ~
+        if self.FLAG_goodScan:
+            self.state  = self.STATE_forward
+            self.reason = "OVER_THRESH"
+        else:        
+            if self.crnr_drop_dist < ( float( self.lastScanNP[-1] ) - self.old_right_mean ): # NOTE: Scan is CW on the RealSense
+            # if self.crnr_drop_dist < ( right_mean - self.old_right_mean ): # NOTE: Scan is CW on the RealSense
+                # IDEA: Take an average of the rightmost readings instead of operating on one only
+                self.state = self.STATE_blind_rght_turn
+                self.reason = "CORNER_DROP"
+            else:
+                self.state = self.STATE_blind_forward
+                self.reason = "UNDER_THRESH"
+            
+        # ~  IV. Clean / Update ~  
+        # NONE
            
            
     def STATE_blind_rght_turn( self ):
@@ -352,10 +395,10 @@ class CarFSM:
         # ~ III. Transition Determination ~
         if self.FLAG_goodScan:
             self.state  = self.STATE_forward
-            self.reason = "GOOD_SCAN"
+            self.reason = "OVER_THRESH"
         else:
             self.state  = self.STATE_blind_rght_turn
-            self.reason = "GOOD_SCAN"
+            self.reason = "UNDER_THRESH"
         
         # ~  IV. Clean / Update ~
         # NONE

@@ -1,6 +1,7 @@
 
 import numpy as np
 from numpy import pi
+from math import sin, cos
 import rospy 
 from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Float32MultiArray
@@ -38,7 +39,7 @@ maxAng = minAng + pi/2.0
 def cart_scan( arr ):
     """ Represent the points in cartesian coordinates """
     arrLen = len( arr )
-    angles = linspace( minAng , maxAng , arrLen )
+    angles = np.linspace( minAng , maxAng , arrLen )
     return [ polr_2_cart_0Y(  [ arr[i] , angles[i] ] ) for i in xrange( arrLen ) ]
 	
 rospy.init_node( 'scan_sherlock' , anonymous = True )
@@ -57,8 +58,10 @@ try:
 		plt.clf() # Clear all figures
 		
 		# Figure 1 , Highlighted Scan
-		plt.figure(1)
+		if plotCarts:
+		    plt.figure(1)
 		plt.plot( lastScanNP , 'bo' )
+		plt.ylim( [ 0 , 20 ] )
 		plt.hold( True )
 		vis_maxes = np.zeros( ( len( lastScan ) ) )
 		if len( above_thresh ) >=2:
