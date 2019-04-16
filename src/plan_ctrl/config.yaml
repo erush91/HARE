@@ -1,9 +1,9 @@
 # Config file for turning a depthimage into an array
 
 # ~~ Filter Config ~~
-numpoints: 400
+numpoints: 100
 scanlines:   3
-scan_rows: [ 150 , 125 , 100 ]
+scan_rows: [ 100 , 125 , 150 ]
 imagewdth: 640
 imagehght: 360
 

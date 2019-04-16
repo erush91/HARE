@@ -46,6 +46,15 @@ find_package(catkin REQUIRED COMPONENTS
 #~ catkin_python_setup() # Use only if there are python packages to *install*, Not necessary for scripts
 
 #  5. Message/Service/Action Generators (add_message_files(), add_service_files(), add_action_files())
+add_message_files(
+   DIRECTORY
+   msg
+   FILES
+   CarState.msg
+   )
+
+
+
 
 #  6. Invoke message/service/action generation (generate_messages())
 generate_messages(DEPENDENCIES 
@@ -54,13 +63,6 @@ generate_messages(DEPENDENCIES
 	geometry_msgs
 	sensor_msgs
 )
-
-#add_message_files(
-##   DIRECTORY
-#   msg
-##   FILES
-#   CarState.msg
-#   )
 
 #  7. Specify package build info export (catkin_package())
 catkin_package(CATKIN_DEPENDS 

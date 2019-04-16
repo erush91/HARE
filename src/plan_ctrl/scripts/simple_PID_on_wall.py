@@ -46,7 +46,7 @@ from geometry_msgs.msg import PoseStamped, Point, Twist
 from ros_pololu_servo.msg import MotorCommand
 from ros_pololu_servo.msg import HARECommand
 # ~ Custom Messages ~
-from plan_ctrl.msg import CarState
+# from plan_ctrl.msg import CarState
 
 # ~~ Local ~~
 from rospy_helpers import ( eq_margin , clamp_val , )
@@ -150,11 +150,11 @@ class CarFSM:
         
         # 3. Start subscribers and listeners
         rospy.Subscriber( "/filtered_distance" , Float32MultiArray , self.scan_cb )
-        self.numReadings = 400
+        self.numReadings = 100
         self.scanCenter  = int(self.numReadings//2)
         self.lastScan = [ 0.0 for i in range( self.numReadings ) ]
         self.lastScanNP = np.asarray( self.lastScan )
-        self.num_right_scans =  5*4
+        self.num_right_scans =  5
         self.old_right_mean  =  0.0 # np.ones((self.num_right_scans))*20
         
         # 4. Start publishers
@@ -165,7 +165,7 @@ class CarFSM:
             rospy.logwarn( "CarFSM: Unable to retrieve control topic! , Setting to " + self.driveTopic )
             
         self.drive_pub = rospy.Publisher( 'HARE_high_level_command' , HARECommand , queue_size = 10 )
-        self.state_pub = rospy.Publisher( 'ctrl_state_report'       , CarState    , queue_size = 10 )
+#        self.state_pub = rospy.Publisher( 'ctrl_state_report'       , CarState    , queue_size = 10 )
         
         # 5. Init vars
         self.initTime = rospy.Time.now().to_sec() # Time that the node was started      
@@ -222,7 +222,7 @@ class CarFSM:
         self.state           = self.STATE_init # Currently-active state, the actual function
         self.seq             =  0 # ------------ Sequence number to give ROS
         self.max_thresh_dist =  8.0 # ---------- Above this value we consider distance to be maxed out [m]
-        self.thresh_count    =  5*3 # ------------ If there are at least this many readings above 'self.max_thresh_dist' 
+        self.thresh_count    =  5 # ------------ If there are at least this many readings above 'self.max_thresh_dist' 
         self.crnr_drop_dist  =  0.65 # --------- Increase in distance of the rightmost reading that will cause transition to the turn state
         self.FLAG_goodScan   = False # --------- Was the last scan appropriate for straight-line driving
         self.reason          = "INIT" # -------- Y U change state?
@@ -282,7 +282,7 @@ class CarFSM:
     def STATE_init( self ):
         """ Initial state , Determine the drving mode """
         
-        SHOWDEBUG = 1
+        SHOWDEBUG = 0
         if SHOWDEBUG:
             print "STATE_init" , self.reason
         
@@ -310,7 +310,7 @@ class CarFSM:
     def STATE_forward( self ):
         """ Straightaway driving , Monitor for turn or fault """
         
-        SHOWDEBUG = 1
+        SHOWDEBUG = 0
         if SHOWDEBUG:
             print "STATE_forward" , self.reason
         
@@ -348,7 +348,7 @@ class CarFSM:
     def STATE_pre_turn( self ):
         """ Approaching halway end, watch for corner detector """
         
-        SHOWDEBUG = 1
+        SHOWDEBUG = 0
         if SHOWDEBUG:
             print "STATE_pre_turn" , self.reason        
         
@@ -356,7 +356,7 @@ class CarFSM:
         cent_of_maxes = self.eval_scan()
         
         # ~  II. Set controls  ~
-        # SAME AS LAST
+        self.steerAngle  = 0.02
         # IDEA: Possible deceleration phase
         # IDEA: Possible fail condition a time t --> turn!
         
@@ -371,7 +371,7 @@ class CarFSM:
                 self.state = self.STATE_blind_rght_turn
                 self.reason = "CORNER_DROP"
             else:
-                self.state = self.STATE_blind_forward
+                self.state = self.STATE_pre_turn
                 self.reason = "UNDER_THRESH"
             
         # ~  IV. Clean / Update ~  
@@ -381,7 +381,7 @@ class CarFSM:
     def STATE_blind_rght_turn( self ):
         """ Turn right at a preset radius until a clear straightaway signal is present """
         
-        SHOWDEBUG = 1
+        SHOWDEBUG = 0
         if SHOWDEBUG:
             print "STATE_blind_rght_turn" , self.reason
         
@@ -421,7 +421,8 @@ class CarFSM:
 	
         # NOTE: Each state must handle its own data collection, processing, control setting, and transition
         self.state() # ------ State actions and transition
-        self.report_state() # Publish state info
+        print self.state.__name__ , ',' , self.reason , ',' , self.steerAngle
+        # self.report_state() # Publish state info
         
     # ___ END FSM __________________________________________________________________________________________________________________________
         
