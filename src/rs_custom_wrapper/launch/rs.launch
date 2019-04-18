@@ -9,6 +9,9 @@
 		<!-- COMPUTE & PUBLISH DEPTH IMAGE -->
 		<param name="DEPTH_FLAG" type="boolean" value="1"/>
 
+                <!-- PUBLISH IMU DATA -->
+                <param name="IMU_FLAG" type="boolean" value="1">
+
 		<!-- DEPTH IMAGE PARAMETERS -->
                 <param name="DEPTH_WIDTH" type="int" value="640"/>
                 <param name="DEPTH_HEIGHT" type="int" value="360"/>
