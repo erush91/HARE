@@ -109,9 +109,11 @@ int main(int argc, char * argv[]) try
     cfg.enable_stream(RS2_STREAM_DEPTH, DEPTH_WIDTH, DEPTH_HEIGHT, RS2_FORMAT_Z16, DEPTH_FPS);
 
     // Configured IMU stream
-    cfg.enable_stream(RS2_STREAM_GYRO);
-    cfg.enable_stream(RS2_STREAM_ACCEL);
-    cfg.enable_stream(RS2_STREAM_POSE);
+    if (IMU_FLAG)
+    {
+        cfg.enable_stream(RS2_STREAM_GYRO, RS2_FORMAT_MOTION_XYZ32F);
+        cfg.enable_stream(RS2_STREAM_ACCEL, RS2_FORMAT_MOTION_XYZ32F);
+    }
 
     // Configured left infrared stream
     // https://github.com/IntelRealSense/librealsense/issues/1140
@@ -262,16 +264,6 @@ int main(int argc, char * argv[]) try
                 imu_msg.angular_velocity.x = gyro_sample.x;
                 imu_msg.angular_velocity.y = gyro_sample.y;
                 imu_msg.angular_velocity.z = gyro_sample.z;
-            }
-        
-            if (rs2::pose_frame pose_frame = frame_set.first_or_default(RS2_STREAM_POSE))
-            {
-                // orientation
-                rs2_pose pose_sample = pose_frame.get_pose_data();
-                imu_msg.orientation.w = pose_sample.rotation.w;
-                imu_msg.orientation.x = pose_sample.rotation.x;
-                imu_msg.orientation.y = pose_sample.rotation.y;
-                imu_msg.orientation.z = pose_sample.rotation.z;
             }
 
             pub_imu.publish(imu_msg);
