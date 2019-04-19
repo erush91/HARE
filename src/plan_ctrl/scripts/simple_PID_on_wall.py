@@ -150,12 +150,15 @@ class CarFSM:
         
         # 3. Start subscribers and listeners
         rospy.Subscriber( "/filtered_distance" , Float32MultiArray , self.scan_cb )
-        self.numReadings = 100
-        self.scanCenter  = int(self.numReadings//2)
-        self.lastScan = [ 0.0 for i in range( self.numReadings ) ]
-        self.lastScanNP = np.asarray( self.lastScan )
-        self.num_right_scans =  5
-        self.old_right_mean  =  0.0 # np.ones((self.num_right_scans))*20
+        # 3.5. Init scan math
+        self.numReadings     = 100
+        self.num_right_scans =   5
+        self.old_right_mean  =   0.0 # np.ones((self.num_right_scans))*20
+        self.prev_rghtmost   =   0.0        
+        self.scanCenter      = int(self.numReadings//2)
+        self.lastScan        = [ 0.0 for i in range( self.numReadings ) ]
+        self.lastScanNP      = np.asarray( self.lastScan )
+        
         
         # 4. Start publishers
         try:
@@ -178,6 +181,7 @@ class CarFSM:
         self.wallSetPnt      =  1.0 # [m]
         self.nearN           = 30 # Count this many points as near the average
         self.slope_window    = 10 # Look this many points in the past to compute slope
+        self.rhgt_rolling    = ListRoll( self.num_right_scans )
         # ~ PID ~
         self.K_d = rospy.get_param( "D_VALUE" )
         self.K_i = rospy.get_param( "I_VALUE" )
@@ -319,7 +323,10 @@ class CarFSM:
         cent_of_maxes = self.eval_scan()
         
         # right_mean    = np.mean( self.lastScanNP[ 0:self.num_right_scans ] )	
-        right_mean    = np.mean( self.lastScanNP[ self.num_right_scans: ] )	# NOTE: Scan is CW on the RealSense
+        # right_mean    = np.mean( self.lastScanNP[ self.num_right_scans: ] )	# NOTE: Scan is CW on the RealSense
+	rightMost  = self.lastScanNP[0]
+	self.rhgt_rolling.add( rightMost )
+	right_mean = np.mean( self.rhgt_rolling )    	
         
         # ~  II. Set controls  ~
         # Calc a new forward effort only if there is a good hallway scan
@@ -343,6 +350,7 @@ class CarFSM:
         
         # ~  IV. Clean / Update ~
         self.old_right_mean = right_mean
+	self.prev_rghtmost  = rightMost	
            
            
     def STATE_pre_turn( self ):
@@ -354,6 +362,9 @@ class CarFSM:
         
         # ~   I. State Calcs   ~
         cent_of_maxes = self.eval_scan()
+	rightMost  = self.lastScanNP[0]
+	self.rhgt_rolling.add( rightMost )
+	right_mean = np.mean( self.rhgt_rolling )        
         
         # ~  II. Set controls  ~
         self.steerAngle  = 0.02
@@ -365,8 +376,10 @@ class CarFSM:
             self.state  = self.STATE_forward
             self.reason = "OVER_THRESH"
         else:        
-            if self.crnr_drop_dist < ( float( self.lastScanNP[-1] ) - self.old_right_mean ): # NOTE: Scan is CW on the RealSense
+            # if self.crnr_drop_dist < ( float( self.lastScanNP[-1] ) - self.old_right_mean ): # NOTE: Scan is CW on the RealSense
             # if self.crnr_drop_dist < ( right_mean - self.old_right_mean ): # NOTE: Scan is CW on the RealSense
+	    # if self.crnr_drop_dist < ( rightMost - self.prev_rghtmost ):
+	    if self.crnr_drop_dist < ( rightMost - right_mean ):	    
                 # IDEA: Take an average of the rightmost readings instead of operating on one only
                 self.state = self.STATE_blind_rght_turn
                 self.reason = "CORNER_DROP"
@@ -375,7 +388,8 @@ class CarFSM:
                 self.reason = "UNDER_THRESH"
             
         # ~  IV. Clean / Update ~  
-        # NONE
+        self.prev_rghtmost  = rightMost
+	self.old_right_mean = right_mean
            
            
     def STATE_blind_rght_turn( self ):

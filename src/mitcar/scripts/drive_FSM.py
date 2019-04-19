@@ -82,6 +82,27 @@ def eq_margin( op1 , op2 , margin = EPSILON ):
 
 # == Program Classes ==
 
+# = Utility Classes =
+
+class ListRoll( list ):
+    """ Rolling List """
+    
+    def __init__( self , pLength ):
+        """ Create a list with a marker for the current index """
+        list.__init__( self , [ 0 for i in xrange( pLength ) ] )
+        self.length  = pLength
+        self.currDex = 0
+        
+    def add( self , element ):
+        """ Insert the element at the current index and increment index """
+        self[ self.currDex ] = element
+        self.currDex = ( self.currDex + 1 ) % self.length
+        
+# _ End Util _
+
+
+# = Controller Classes =
+
 class CarFSM:
     """ A Finite State Machine for autonomous car motion planning """
     
@@ -107,6 +128,7 @@ class CarFSM:
         self.lastScanNP = np.asarray( self.lastScan )
         self.num_right_scans = 5
         self.old_right_mean  = 0.0 # np.ones((self.num_right_scans))*20
+	self.prev_rghtmost   = 0.0
         
         # 4. Start publishers
         try:
@@ -128,6 +150,7 @@ class CarFSM:
         self.wallSetPnt      =  3.0 # [m]
         self.nearN           = 30 # Count this many points as near the average
         self.slope_window    = 10 # Look this many points in the past to compute slope
+	self.rhgt_rolling    = ListRoll( self.num_right_scans )
 
         # 7. FSM Vars
         self.set_FSM_vars()
@@ -232,7 +255,10 @@ class CarFSM:
 	# ~   I. State Calcs   ~
 	# 1. Calculate and store error
 	cent_of_maxes = self.eval_scan()
-	right_mean    = np.mean( self.lastScanNP[ 0:self.num_right_scans ] )	
+	# right_mean    = np.mean( self.lastScanNP[ 0:self.num_right_scans ] )	
+	rightMost  = self.lastScanNP[0]
+	self.rhgt_rolling.add( rightMost )
+	right_mean = np.mean( self.rhgt_rolling )	
 	
 	# ~  II. Set controls  ~
 	if self.FLAG_goodScan:
@@ -244,13 +270,15 @@ class CarFSM:
 	    self.linearSpeed = self.straight_speed
 	
 	# ~ III. Transition Determination ~
-	if 0.3 < ( float( self.lastScanNP[0] ) - self.old_right_mean ):
+	# if 0.8 < ( rightMost - self.prev_rghtmost ):
+	if 0.8 < ( rightMost - right_mean ):
 	    self.state = self.STATE_blind_rght_turn
 	else:
 	    self.state = self.STATE_forward
 	
 	# ~  IV. Clean / Update ~
-	self.old_right_mean = right_mean
+	# self.old_right_mean = right_mean
+	self.prev_rghtmost = rightMost
        
     def STATE_blind_rght_turn( self ):
 	""" Turn right at a preset radius until a clear straightaway signal is present """
@@ -401,6 +429,8 @@ class CarFSM:
 
         print 'translation error:' , translation_err , 'steer:' , self.steerAngle
         # ~ robot.move(steering_angle, speed)    
+
+# _ End Ctrl _
 
 # __ End Class __
 
