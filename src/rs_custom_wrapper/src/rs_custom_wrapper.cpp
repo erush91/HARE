@@ -18,6 +18,7 @@
 #include <librealsense2/rs.hpp>
 #include <librealsense2/rs_advanced_mode.hpp>
 #include "rs_custom_wrapper/rs_custom_wrapper.h"
+#include <sensor_msgs/Imu.h>
 
 // https://stackoverflow.com/questions/19331575/cout-and-endl-errors
 using std::cout;
@@ -245,28 +246,35 @@ int main(int argc, char * argv[]) try
         {
             sensor_msgs::Imu imu_msg;
 
-            if (rs2::motion_frame accel_frame = frameset.first_or_default(RS2_STREAM_ACCEL))
+            if (rs2::motion_frame accel_frame = frame_set.first_or_default(RS2_STREAM_ACCEL))
             {
                 // linear acceleration
                 rs2_vector accel_sample = accel_frame.get_motion_data();
-                imu_msg.linear_acceleration = accel_sample;
+                imu_msg.linear_acceleration.x = accel_sample.x;
+                imu_msg.linear_acceleration.y = accel_sample.y;
+                imu_msg.linear_acceleration.z = accel_sample.z;
             }
         
-            if (rs2::motion_frame gyro_frame = frameset.first_or_default(RS2_STREAM_GYRO))
+            if (rs2::motion_frame gyro_frame = frame_set.first_or_default(RS2_STREAM_GYRO))
             {
                 // angular velocity
                 rs2_vector gyro_sample = gyro_frame.get_motion_data();
-                imu_msg.angular_velocity = gyro_sample;
+                imu_msg.angular_velocity.x = gyro_sample.x;
+                imu_msg.angular_velocity.y = gyro_sample.y;
+                imu_msg.angular_velocity.z = gyro_sample.z;
             }
         
-            if (rs2::pose_frame pose_frame = frameset.first_or_default(RS2_STREAM_POSE))
+            if (rs2::pose_frame pose_frame = frame_set.first_or_default(RS2_STREAM_POSE))
             {
                 // orientation
                 rs2_pose pose_sample = pose_frame.get_pose_data();
-                imu_msg.orientation = pose_sample;
+                imu_msg.orientation.w = pose_sample.rotation.w;
+                imu_msg.orientation.x = pose_sample.rotation.x;
+                imu_msg.orientation.y = pose_sample.rotation.y;
+                imu_msg.orientation.z = pose_sample.rotation.z;
             }
 
-            pub_imu.publish(imu_msg)
+            pub_imu.publish(imu_msg);
         }
 
         if(DEPTH_FLAG)
