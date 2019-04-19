@@ -225,7 +225,7 @@ class CarFSM:
         # ~ FSM Vars ~
         self.state           = self.STATE_init # Currently-active state, the actual function
         self.seq             =  0 # ------------ Sequence number to give ROS
-        self.max_thresh_dist =  8.0 # ---------- Above this value we consider distance to be maxed out [m]
+        self.max_thresh_dist =  9.0 # ---------- Above this value we consider distance to be maxed out [m]
         self.thresh_count    =  5 # ------------ If there are at least this many readings above 'self.max_thresh_dist' 
         self.crnr_drop_dist  =  0.65 # --------- Increase in distance of the rightmost reading that will cause transition to the turn state
         self.FLAG_goodScan   = False # --------- Was the last scan appropriate for straight-line driving
@@ -235,6 +235,7 @@ class CarFSM:
         self.straight_speed =  0.08 # Speed for 'STATE_forward'	
         self.turning_speed  =  0.08 # Speed for 'STATE_blind_rght_turn'
         self.turning_angle  =  0.40 # Turn angle for 'STATE_blind_rght_turn'
+        self.preturn_angle  =  0.02
             
     def eval_scan( self ):
         """ Populate the threshold array and return its center """
@@ -324,9 +325,9 @@ class CarFSM:
         
         # right_mean    = np.mean( self.lastScanNP[ 0:self.num_right_scans ] )	
         # right_mean    = np.mean( self.lastScanNP[ self.num_right_scans: ] )	# NOTE: Scan is CW on the RealSense
-	rightMost  = self.lastScanNP[0]
-	self.rhgt_rolling.add( rightMost )
-	right_mean = np.mean( self.rhgt_rolling )    	
+        rightMost  = self.lastScanNP[-1]
+        self.rhgt_rolling.add( rightMost )
+        right_mean = np.mean( self.rhgt_rolling )    	
         
         # ~  II. Set controls  ~
         # Calc a new forward effort only if there is a good hallway scan
@@ -350,7 +351,7 @@ class CarFSM:
         
         # ~  IV. Clean / Update ~
         self.old_right_mean = right_mean
-	self.prev_rghtmost  = rightMost	
+        self.prev_rghtmost  = rightMost	
            
            
     def STATE_pre_turn( self ):
@@ -362,12 +363,12 @@ class CarFSM:
         
         # ~   I. State Calcs   ~
         cent_of_maxes = self.eval_scan()
-	rightMost  = self.lastScanNP[0]
-	self.rhgt_rolling.add( rightMost )
-	right_mean = np.mean( self.rhgt_rolling )        
+        rightMost  = self.lastScanNP[-1]
+        self.rhgt_rolling.add( rightMost )
+        right_mean = np.mean( self.rhgt_rolling )        
         
         # ~  II. Set controls  ~
-        self.steerAngle  = 0.02
+        self.steerAngle = self.preturn_angle
         # IDEA: Possible deceleration phase
         # IDEA: Possible fail condition a time t --> turn!
         
@@ -378,9 +379,8 @@ class CarFSM:
         else:        
             # if self.crnr_drop_dist < ( float( self.lastScanNP[-1] ) - self.old_right_mean ): # NOTE: Scan is CW on the RealSense
             # if self.crnr_drop_dist < ( right_mean - self.old_right_mean ): # NOTE: Scan is CW on the RealSense
-	    # if self.crnr_drop_dist < ( rightMost - self.prev_rghtmost ):
-	    if self.crnr_drop_dist < ( rightMost - right_mean ):	    
-                # IDEA: Take an average of the rightmost readings instead of operating on one only
+            # if self.crnr_drop_dist < ( rightMost - self.prev_rghtmost ):
+            if self.crnr_drop_dist < ( rightMost - right_mean ):	    
                 self.state = self.STATE_blind_rght_turn
                 self.reason = "CORNER_DROP"
             else:
@@ -389,7 +389,7 @@ class CarFSM:
             
         # ~  IV. Clean / Update ~  
         self.prev_rghtmost  = rightMost
-	self.old_right_mean = right_mean
+        self.old_right_mean = right_mean
            
            
     def STATE_blind_rght_turn( self ):
