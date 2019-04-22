@@ -15,7 +15,7 @@
 # Script arguments
  
 # ip address
-ARG1=${1:-192.168.100.50}
+ARG1=${1:-192.168.100.50} # CAR
 # mtu 
 ARG2=${2:-1560}
 # frequency

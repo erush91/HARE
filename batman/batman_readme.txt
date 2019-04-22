@@ -6,9 +6,12 @@ sudo apt install batctl
 
 e.g.
 
-127.0.0.1	localhost
-192.168.100.51	odroid
-192.168.100.53	gene_surface
+127.0.0.1       localhost
+192.168.100.50  odroid
+192.168.100.51  gene_surface # Gene
+192.168.100.52  flatmachine  # James
+192.168.100.53  mike-K501LX  # Mike F
+192.168.100.71  bprl-MacBookPro # BPRL
 
 3. Do not edit setupBatman.sh
 
@@ -16,7 +19,7 @@ e.g.
 
 e.g. 
 
-ARG1=${1:-192.168.100.53}
+ARG1=${1:-192.168.100.50}
 
 5. Edit setupBatman.sh Line 35: Specify WiFi device ID (find from ifconfig)
 
