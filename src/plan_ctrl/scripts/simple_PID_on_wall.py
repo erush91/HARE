@@ -184,7 +184,7 @@ class CarFSM:
         self.tim_hist        = [ 0 for i in range( self.err_hist_window ) ] # Integration window
         self.wallSetPnt      =  1.0 # [m]
         self.nearN           = 30 # Count this many points as near the average
-        self.slope_window    = 10 # Look this many points in the past to compute slope
+        self.slope_window    =  2 # Look this many points in the past to compute slope
         self.rhgt_rolling    = ListRoll( self.num_right_scans )
         # ~ PID ~
         self.K_d = rospy.get_param( "D_VALUE" )
@@ -245,8 +245,13 @@ class CarFSM:
         self.FLAG_goodScan   = False # --------- Was the last scan appropriate for straight-line driving
         self.reason          = "INIT" # -------- Y U change state?
 
+        # ~ PID Vars ~
+        self.currUp = 0.0
+        self.currUi = 0.0
+        self.currUd = 0.0
+
         # ~ State-Specific Constants ~
-        self.straight_speed =  0.08 # Speed for 'STATE_forward'
+        self.straight_speed =  0.12 # Speed for 'STATE_forward'
         self.turning_speed  =  0.08 # Speed for 'STATE_blind_rght_turn'
         self.turning_angle  =  0.40 # Turn angle for 'STATE_blind_rght_turn'
         self.preturn_angle  =  0.02
@@ -287,6 +292,9 @@ class CarFSM:
         msg.FLAG_goodScan   = self.FLAG_goodScan #- Was there a good scan noted this timestep?
         msg.steerAngle      = self.steerAngle  # -- Steering angle demanded
         msg.linearSpeed     = self.linearSpeed  # - Motor speed demanded
+        msg.up              = self.currUp 
+        msg.ui              = self.currUi
+        msg.ud              = self.currUd
         # 3. Publish msg
         self.state_pub.publish( msg )
 
@@ -391,10 +399,10 @@ class CarFSM:
         if self.FLAG_goodScan:
             # translation_err  = cent_of_maxes * 1.0 - self.scanCenter
             translation_err  = self.update_err( cent_of_maxes , self.scanCenter )
-            u_p              = self.K_p * translation_err
-            u_i              = self.K_i * self.integrate_err()
-            u_d              = self.K_d * self.rate_err() # This should be a
-            auto_steer       = u_p + u_i + u_d # NOTE: P-ctrl only for demo
+            self.currUp      = self.K_p * translation_err
+            self.currUi      = self.K_i * self.integrate_err()
+            self.currUd      = self.K_d * self.rate_err() # This should be a
+            auto_steer       = self.currUp + self.currUi + self.currUd # NOTE: P-ctrl only for demo
 
             # Control Effort
             self.steerAngle  = auto_steer

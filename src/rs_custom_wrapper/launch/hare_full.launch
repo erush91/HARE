@@ -25,7 +25,7 @@
     
     <!-- param name="P_VALUE" type="double" value="1.0000"/ --> <!-- 'wall_follow_state' controls on "meters" -->
     <param name="P_VALUE" type="double" value="0.0500"/> <!-- 'hallway_FSM' controls on "indices" -->
-    <param name="I_VALUE" type="double" value="0.0001"/>
+    <param name="I_VALUE" type="double" value="0.0020"/>
     
     <param name="D_VALUE" type="double" value="0.0000"/>
     <node name="CarFSM" pkg="plan_ctrl" type="simple_PID_on_wall.py" output="screen" />

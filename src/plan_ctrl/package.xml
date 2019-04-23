@@ -72,6 +72,7 @@
 	<run_depend>std_msgs</run_depend>
 	<run_depend>visualization_msgs</run_depend>
 	<run_depend>geometry_msgs</run_depend>
+        <run_depend>rosflight_msgs</run_depend>
     <run_depend>sensor_msgs</run_depend>
 
 	<!-- Test Dependencies specify only additional dependencies for unit tests.
