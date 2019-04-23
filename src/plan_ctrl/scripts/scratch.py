@@ -15,6 +15,8 @@ bounds = even_index_bounds( 720 , 100 )
 print bounds
 print len( bounds )
 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 print "==================================================================="
 
 class ListRoll( list ):
@@ -22,14 +24,25 @@ class ListRoll( list ):
     
     def __init__( self , pLength ):
         """ Create a list with a marker for the current index """
-        list.__init__( self , [ 0 for i in xrange( pLength ) ] )
+        self.lst     = [ 0 for i in xrange( pLength ) ]
         self.length  = pLength
         self.currDex = 0
         
     def add( self , element ):
         """ Insert the element at the current index and increment index """
-        self[ self.currDex ] = element
+        self.lst[ self.currDex ] = element
         self.currDex = ( self.currDex + 1 ) % self.length
+        
+#    def get_subarr( self , bgnDex , endDex ):
+#        """ Get the wrapping slice beginning at 'bgnDex' and ending with 'endDex-1', inclusive """
+#        # NOTE: This function assumes 'bgnDex < endDex == True'
+#        rtnSlice = []
+#        currDex  = bgnDex
+#        while currDex < endDex:
+#            rtnSlice.append(  )
+        
+        
+        
         
 testArr = ListRoll( 5 )
 
@@ -38,3 +51,29 @@ for i in xrange(1,21):
     print testArr , ',' , len( testArr ) , sum( testArr )
         
 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    
+print "==================================================================="
+
+
+class Slicer( list ):
+    
+    def __init__( self ):
+        list.__init__( self, list( xrange( 100 ) ) )
+        pass
+    
+    def __getitem__( self , indices ):
+        print "__getitem__"
+        print type( indices ) , ':' , indices 
+        if type( indices ) == slice:
+            print indices.start , indices.stop , indices.step 
+        else:
+            print type( indices )
+        print
+        
+foo = Slicer()
+
+foo[4]
+foo[1,4]
+foo[-8,-4]
+foo[-300:-5:4]

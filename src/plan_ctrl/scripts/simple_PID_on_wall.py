@@ -276,6 +276,49 @@ class CarFSM:
         # 3. Publish msg
         self.state_pub.publish( msg )
         
+    def update_err( self , x_act , x_des ):
+        """ Calc the scalar error = 'x_act - x_des' and update I and D structures """
+        # 1. Calc the loop duration
+        nowTime = rospy.Time.now().to_sec() # -- Get the current time
+        loopDuration = nowTime - self.lastTime # Time delta between the start of this loop and the start of the last loop
+        self.tim_hist.append( loopDuration )    
+        if len( self.tim_hist ) > self.err_hist_window:
+            self.tim_hist.pop(0) 
+        self.lastTime = nowTime         
+        # 2. Calc the error
+        err = x_act - x_des
+        self.err_hist.append( err )
+        if len( self.err_hist ) > self.err_hist_window:
+            self.err_hist.pop(0)    
+        return err
+        
+    def integrate_err( self ):
+        """ Rectangular integration of error over time """
+        curveArea = 0.0
+        for i in xrange( self.err_hist_window ):
+            curveArea += self.err_hist[i] * self.tim_hist[i]
+        return curveArea
+        
+    def rate_err( self ):
+        """ Average time rate of change in error over a window """
+        rmethod  = 1
+	# A. Average Slope
+	if method:
+	    errChange = self.err_hist[ -1 ] - self.err_hist[ -self.slope_window ]
+	    timChange = sum( self.tim_hist[ -self.slope_window: ] )
+	    return errChange / timChange
+	# B. Average of Slopes
+	else:
+	    rateTot = 0.0
+	    for i in xrange( self.slope_window ):
+		change     = self.err_hist[ -(i) ] - self.err_hist[ -(i+1) ]
+		if self.tim_hist[ -(i) ] > 0:
+		    rateChange = change / self.tim_hist[ -(i) ]
+		else:
+		    rateChange = 0.0
+		rateTot   += rateChange
+	    return rateTot / self.slope_window      
+        
     """
     STATE_funcname
     # ~   I. State Calcs   ~
@@ -332,9 +375,12 @@ class CarFSM:
         # ~  II. Set controls  ~
         # Calc a new forward effort only if there is a good hallway scan
         if self.FLAG_goodScan:
-            translation_err  = cent_of_maxes * 1.0 - self.scanCenter
-            u_p              = self.K_p * translation_err	
-            auto_steer       = u_p # + u_i + u_d # NOTE: P-ctrl only for demo
+            # translation_err  = cent_of_maxes * 1.0 - self.scanCenter
+            translation_err  = self.update_err( cent_of_maxes , self.scanCenter )
+            u_p              = self.K_p * translation_err
+            u_i              = self.K_i * self.integrate_err()
+            u_d              = self.K_d * self.rate_err() # This should be a 
+            auto_steer       = u_p + u_i + u_d # NOTE: P-ctrl only for demo
             
             # Control Effort
             self.steerAngle  = auto_steer	
@@ -444,7 +490,9 @@ class CarFSM:
         """ Check to see if the new steering angle is large enough to warrant a command this prevents micro commands to the servo
             True  : There is a sufficiently different command to publish
             False : Microcommand, do not publish """
-        if  ( np.abs( self.steerAngle - self.prevSteerAngle ) > self.angleDiffMin )  or  ( not eq_margin( self.linearSpeed , self.prevLinarSpeed ) ):
+        if  ( np.abs( self.steerAngle - self.prevSteerAngle ) > self.angleDiffMin )  or  ( not eq_margin( self.linearSpeed , self.prevLinarSpeed ) ) \
+	    or ( rospy.Time.now().to_sec() - self.initTime < 0.25 ):
+            
             self.prevSteerAngle = self.steerAngle
             self.prevLinarSpeed = self.linearSpeed
             self.FLAG_newCtrl   = True
@@ -512,26 +560,7 @@ class CarFSM:
             if totNonZ > 0:
                 return totNonZ / numNonZ
             else:
-                return 0.0    
-        
-    def integrate_err( self ):
-        """ Rectangular integration of error over time """
-        curveArea = 0.0
-        for i in xrange( self.err_hist_window ):
-            curveArea += self.err_hist[i] * self.tim_hist[i]
-        return curveArea
-        
-    def rate_err( self ):
-        """ Average time rate of change in error over a window """
-        rateTot = 0.0
-        for i in xrange( self.slope_window ):
-            change     = self.err_hist[ -(i) ] - self.err_hist[ -(i+1) ]
-            if self.tim_hist[ -(i) ] > 0:
-                rateChange = change / self.tim_hist[ -(i) ]
-            else:
-                rateChange = 0.0
-            rateTot   += rateChange
-        return rateTot / self.slope_window    
+                return 0.0      
         
     def wall_follow_state( self ):
         """ Try to maintain a set distance from the wall """
