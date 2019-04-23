@@ -37,9 +37,9 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs # --------- Primitive messages
   visualization_msgs # RViz
   geometry_msgs # ---- Vectors, Quaternions, Poses
-  sensor_msgs 
+  sensor_msgs
   # ~ Local Packages ~
-  # YOUR PKGs HERE
+  rosflight_msgs
 )
 
 #  4. Enable Python module support (catkin_python_setup())
@@ -57,7 +57,7 @@ add_message_files(
 
 
 #  6. Invoke message/service/action generation (generate_messages())
-generate_messages(DEPENDENCIES 
+generate_messages(DEPENDENCIES
 	std_msgs
 	visualization_msgs
 	geometry_msgs
@@ -65,13 +65,14 @@ generate_messages(DEPENDENCIES
 )
 
 #  7. Specify package build info export (catkin_package())
-catkin_package(CATKIN_DEPENDS 
+catkin_package(CATKIN_DEPENDS
 	# message_generation
-	message_runtime 
+	message_runtime
 	std_msgs
 	visualization_msgs
 	geometry_msgs
 	sensor_msgs
+  rosflight_msgs
 )
 
 catkin_package(
@@ -88,7 +89,7 @@ include_directories(
 
 #  9. Tests to build (catkin_add_gtest())
 
-# 10. Install rules (install()) 
+# 10. Install rules (install())
 
 # ___ END ROS ______________________________________________________________________________________________________________________________
 
@@ -108,7 +109,7 @@ set( ROS_HELP_CPP cpp_helpers/ROS_Helpers.cpp ) # Shortcut for the "ROS_Helpers"
 
 # ~~~ <EXEC NAME HERE> ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-add_executable( rs_array_filter 
+add_executable( rs_array_filter
 			    rs_array_filter.cpp
 			    ${CPP_HELP_CPP} ${ROS_HELP_CPP} )
 
