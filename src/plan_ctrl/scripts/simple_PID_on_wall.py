@@ -153,7 +153,7 @@ class CarFSM:
         rospy.Subscriber( "/filtered_distance" , Float32MultiArray , self.scan_cb )
         rospy.Subscriber( "/rc_raw", RCRaw, self.rc_cb )
         self.rc_msg = RCRaw()
-        self.FLAG_estop = False
+        self.FLAG_ = False
         # 3.5. Init scan math
         self.numReadings     = 100
         self.num_right_scans =   5
@@ -400,9 +400,6 @@ class CarFSM:
             self.steerAngle  = auto_steer
             # self.steerAngle  = -auto_steer
             self.linearSpeed = self.straight_speed
-            if self.FLAG_estop:
-                #rospy.loginfo("estop")
-                self.linearSpeed = 0.0 
 
         # ~ III. Transition Determination ~
         if self.FLAG_goodScan:
@@ -432,10 +429,7 @@ class CarFSM:
 
         # ~  II. Set controls  ~
         self.steerAngle = self.preturn_angle
-        if self.FLAG_estop:
-            #rospy.loginfo("estop")
-            self.linearSpeed = 0.0 
-        
+
         # IDEA: Possible deceleration phase
         # IDEA: Possible fail condition a time t --> turn!
 
@@ -471,9 +465,6 @@ class CarFSM:
 
         # ~  II. Set controls  ~
         self.linearSpeed = self.turning_speed
-        if self.FLAG_estop:
-            #rospy.loginfo("estop")
-            self.linearSpeed = 0.0
 
         self.steerAngle  = self.turning_angle
 
@@ -539,12 +530,13 @@ class CarFSM:
             else: # Enable test - Unchanging open loop command
                 self.test_state()
 
+            if self.FLAG_estop:
+                rospy.loginfo("estop")
+                self.linearSpeed = 0.0
+
             # 2. Transmit the control effort
             if self.FLAG_newCtrl:
                 #print( "Steering Angle:" , self.steerAngle , ", Speed:" , self.linearSpeed )
-                if self.FLAG_estop:
-                    rospy.loginfo("estop")
-                    self.linearSpeed = 0.0
 
                 self.drive_pub.publish(  compose_HARE_ctrl_msg( self.steerAngle , self.linearSpeed )  )
 
