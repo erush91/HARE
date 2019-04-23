@@ -162,7 +162,7 @@ class CarFSM:
         self.scanCenter      = int(self.numReadings//2)
         self.lastScan        = [ 0.0 for i in range( self.numReadings ) ]
         self.lastScanNP      = np.asarray( self.lastScan )
-
+        self.FLAG_estop = False
 
         # 4. Start publishers
         try:
