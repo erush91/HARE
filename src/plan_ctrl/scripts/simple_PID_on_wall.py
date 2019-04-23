@@ -533,6 +533,7 @@ class CarFSM:
             if self.FLAG_estop:
                 rospy.loginfo("estop")
                 self.linearSpeed = 0.0
+                self.drive_pub.publish(  compose_HARE_ctrl_msg( self.steerAngle , self.linearSpeed )  )
 
             # 2. Transmit the control effort
             if self.FLAG_newCtrl:
