@@ -16,7 +16,8 @@
 
     <!-- Start Planner -->
     <param name="LINEAR_SPEED" type="double" value="0.08"/>
-    <param name="ANGLE_DIFF_MIN" type="double" value="0.0"/>
+    
+    <param name="ANGLE_DIFF_MIN" type="double" value="0.196"/> <!-- pi/16 = 0.196 -->
     
     <!-- param name="P_VALUE" type="double" value="1.0000"/ --> <!-- 'wall_follow_state' controls on "meters" -->
     <param name="P_VALUE" type="double" value="0.0500"/> <!-- 'hallway_FSM' controls on "indices" -->
