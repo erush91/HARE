@@ -51,6 +51,8 @@ add_message_files(
    msg
    FILES
    CarState.msg
+   FourierCoefsMsg.msg
+
    )
 
 
