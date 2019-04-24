@@ -281,9 +281,9 @@ class CarFSM:
         self.currUd = 0.0
 
         # ~ State-Specific Constants ~
-        self.straight_speed =  0.12 # Speed for 'STATE_forward'
+        self.straight_speed =  0.16 # Speed for 'STATE_forward'
         self.turning_speed  =  0.08 # Speed for 'STATE_blind_rght_turn'
-        self.turning_angle  =  0.40 # Turn angle for 'STATE_blind_rght_turn'
+        self.turning_angle  =  1.20 # Turn angle for 'STATE_blind_rght_turn'
         self.preturn_angle  =  0.02
 
     def eval_scan( self ):
