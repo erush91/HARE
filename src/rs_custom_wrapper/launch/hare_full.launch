@@ -18,7 +18,8 @@
     <rosparam command="load" file="$(find plan_ctrl)/config.yaml" />
     <node name="cam_arr_filter" pkg="plan_ctrl" type="rs_array_filter" output="screen" />
 
-    <!-- Start Planner -->
+    
+    <!-- Planner Params -->
     <param name="LINEAR_SPEED" type="double" value="0.08"/>
     
     <param name="ANGLE_DIFF_MIN" type="double" value="0.196"/> <!-- pi/16 = 0.196 -->
@@ -26,8 +27,9 @@
     <!-- param name="P_VALUE" type="double" value="1.0000"/ --> <!-- 'wall_follow_state' controls on "meters" -->
     <param name="P_VALUE" type="double" value="0.0500"/> <!-- 'hallway_FSM' controls on "indices" -->
     <param name="I_VALUE" type="double" value="0.0020"/>
-    
     <param name="D_VALUE" type="double" value="0.0000"/>
+  
+    <!-- Start Planner -->
     <node name="CarFSM" pkg="plan_ctrl" type="simple_PID_on_wall.py" output="screen" />
 
     <!-- Start Recording , URL: https://answers.ros.org/question/52773/record-with-rosbag-from-launch-file/?answer=52856#post-id-52856 -->
