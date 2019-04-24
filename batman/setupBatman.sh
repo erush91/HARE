@@ -15,7 +15,7 @@
 # Script arguments
  
 # ip address
-ARG1=${1:-192.168.100.53}
+ARG1=${1:-192.168.100.50}
 # mtu 
 ARG2=${2:-1560}
 # frequency
@@ -32,7 +32,8 @@ tmpVar=$(iw dev | awk '$1=="Interface"{print $2}')
 #get the top device name returned.  Assumes the top listing is what is needed
 arr=($(echo $tmpVar | tr " " "\n"))
 #devID=$arr
-devID=wlx000f020202da
+devID=wlan0 # WiFi Device ID on oDroid
+#devID=wlx000f020202da
 #devID=wlx00198671e13c # good carl, used on gene_surface in Hidee Mine 
 #devID=wlx0013ef202488 # bad inconsistent odroid
 #devID=wlx00198671d7ec # bad managed carl

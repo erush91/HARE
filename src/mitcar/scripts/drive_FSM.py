@@ -82,6 +82,27 @@ def eq_margin( op1 , op2 , margin = EPSILON ):
 
 # == Program Classes ==
 
+# = Utility Classes =
+
+class ListRoll( list ):
+    """ Rolling List """
+    
+    def __init__( self , pLength ):
+        """ Create a list with a marker for the current index """
+        list.__init__( self , [ 0 for i in xrange( pLength ) ] )
+        self.length  = pLength
+        self.currDex = 0
+        
+    def add( self , element ):
+        """ Insert the element at the current index and increment index """
+        self[ self.currDex ] = element
+        self.currDex = ( self.currDex + 1 ) % self.length
+        
+# _ End Util _
+
+
+# = Controller Classes =
+
 class CarFSM:
     """ A Finite State Machine for autonomous car motion planning """
     
@@ -107,6 +128,7 @@ class CarFSM:
         self.lastScanNP = np.asarray( self.lastScan )
         self.num_right_scans = 5
         self.old_right_mean  = 0.0 # np.ones((self.num_right_scans))*20
+	self.prev_rghtmost   = 0.0
         
         # 4. Start publishers
         try:
@@ -128,19 +150,24 @@ class CarFSM:
         self.wallSetPnt      =  3.0 # [m]
         self.nearN           = 30 # Count this many points as near the average
         self.slope_window    = 10 # Look this many points in the past to compute slope
+	self.rhgt_rolling    = ListRoll( self.num_right_scans )
 
         # 7. FSM Vars
         self.set_FSM_vars()
 	
         # ~ PID ~
-        self.K_d = 0.0080
-        self.K_i = 0.00000
-        self.K_p = 0.8000
+	self.K_p =  0.0700
+        self.K_d =  0.0001
+        self.K_i =  0.0000
         self.FSM_K_p = 0.005
         
         # ~ Control Output ~
-        self.steerAngle  = 0.0
-        self.linearSpeed = 0.0
+        self.steerAngle     = 0.0
+	self.prevSteerAngle = 0.0
+	self.linearSpeed    = 0.0 # [ -1 ,  1 ]	
+	self.prevLinarSpeed = 0.0
+	self.angleDiffMin   = pi / 16.0 # limits micro commands
+	
         
     def scan_cb( self , msg ):
         """ Process the scan that comes back from the scanner """
@@ -160,12 +187,15 @@ class CarFSM:
 	self.state           = self.STATE_init # -- Currently-active state, the actual function
 	self.max_thresh_dist =  9.0 # ------------- Above this value we consider distance to be maxed out
 	self.thresh_count    = 10 # --------------- If there are at least this many readings above 'self.max_thresh_dist' 
+	self.crnr_drop_dist  =  0.85 # --------- Increase in distance of the rightmost reading that will cause transition to the turn state
 	self.FLAG_goodScan   = False # ------------ Was the last scan appropriate for straight-line driving
+	self.reason          = "INIT" # -------- Y U change state?
 	
 	# ~ State-Specific Constants ~
 	self.straight_speed =  4.0 # Speed for 'STATE_forward'	
 	self.turning_speed  =  3.0 # Speed for 'STATE_blind_rght_turn'
 	self.turning_angle  = -0.1 # Turn angle for 'STATE_blind_rght_turn'
+	self.preturn_angle  =  0.00
         
     def eval_scan( self ):
 	""" Populate the threshold array and return its center """
@@ -188,6 +218,49 @@ class CarFSM:
 	# 3. Return the center of the above-threshold values
 	return np.mean( self.above_thresh )
         
+    def update_err( self , x_act , x_des ):
+        """ Calc the scalar error = 'x_act - x_des' and update I and D structures """
+        # 1. Calc the loop duration
+        nowTime = rospy.Time.now().to_sec() # -- Get the current time
+        loopDuration = nowTime - self.lastTime # Time delta between the start of this loop and the start of the last loop
+        self.tim_hist.append( loopDuration )    
+        if len( self.tim_hist ) > self.err_hist_window:
+            self.tim_hist.pop(0) 
+        self.lastTime = nowTime         
+        # 2. Calc the error
+        err = x_act - x_des
+        self.err_hist.append( err )
+        if len( self.err_hist ) > self.err_hist_window:
+            self.err_hist.pop(0)    
+        return err
+        
+    def integrate_err( self ):
+        """ Rectangular integration of error over time """
+        curveArea = 0.0
+        for i in xrange( self.err_hist_window ):
+            curveArea += self.err_hist[i] * self.tim_hist[i]
+        return curveArea
+        
+    def rate_err( self ):
+        """ Average time rate of change in error over a window """
+	method  = 1
+	# A. Average Slope
+	if method:
+	    errChange = self.err_hist[ -1 ] - self.err_hist[ -self.slope_window ]
+	    timChange = sum( self.tim_hist[ -self.slope_window: ] )
+	    return errChange / timChange
+	# B. Average of Slopes
+	else:
+	    rateTot = 0.0
+	    for i in xrange( self.slope_window ):
+		change     = self.err_hist[ -(i) ] - self.err_hist[ -(i+1) ]
+		if self.tim_hist[ -(i) ] > 0:
+		    rateChange = change / self.tim_hist[ -(i) ]
+		else:
+		    rateChange = 0.0
+		rateTot   += rateChange
+	    return rateTot / self.slope_window        
+        
     """
     STATE_funcname
     # ~   I. State Calcs   ~
@@ -201,7 +274,7 @@ class CarFSM:
 	
 	SHOWDEBUG = 1
 	if SHOWDEBUG:
-	    print "STATE_init"
+	    print "STATE_init" , self.reason
 	
 	# ~   I. State Calcs   ~
 	self.eval_scan() # Assess straight-line driving
@@ -212,12 +285,15 @@ class CarFSM:
 	
 	# ~ III. Transition Determination ~	
 	# NOTE: At the moment, safest transition is probably to wait for the first straightaway
-	# A. If there is a good straightaway scan, then set the forward state
-	if self.FLAG_goodScan:
-	    self.state = self.STATE_forward
-	# B. Otherwise, wait for a good hallway scan (This way we can troubleshoot just by wathcing wheel motion)
-	else:
-	    self.state = self.STATE_init
+	# NOTE: At the moment, safest transition is probably to wait for the first straightaway
+        # A. If there is a good straightaway scan, then set the forward state
+        if self.FLAG_goodScan:
+            self.state  = self.STATE_forward
+            self.reason = "OVER_THRESH"
+        # B. Otherwise, wait for a good hallway scan (This way we can troubleshoot just by wathcing wheel motion)
+        else:
+            self.state  = self.STATE_init
+            self.reason = "UNDER_THRESH"
 	    
 	# ~  IV. Clean / Update ~
 	# NONE
@@ -227,37 +303,84 @@ class CarFSM:
 	
 	SHOWDEBUG = 1
 	if SHOWDEBUG:
-	    print "STATE_forward"	
+	    print "STATE_forward" , self.reason
 	
 	# ~   I. State Calcs   ~
 	# 1. Calculate and store error
 	cent_of_maxes = self.eval_scan()
-	right_mean    = np.mean( self.lastScanNP[ 0:self.num_right_scans ] )	
+	# right_mean    = np.mean( self.lastScanNP[ 0:self.num_right_scans ] )	
+	rightMost  = self.lastScanNP[0]
+	self.rhgt_rolling.add( rightMost )
+	right_mean = np.mean( self.rhgt_rolling )	
 	
 	# ~  II. Set controls  ~
 	if self.FLAG_goodScan:
-	    translation_err  = cent_of_maxes * 1.0 - self.scanCenter
-	    u_p              = self.FSM_K_p * translation_err	
-	    auto_steer       = u_p # + u_i + u_d # NOTE: P-ctrl only for demo
+	    translation_err  = self.update_err( cent_of_maxes , self.scanCenter )
+            u_p              = self.K_p * translation_err
+            u_i              = self.K_i * self.integrate_err()
+            u_d              = self.K_d * self.rate_err() # This should be a 
+            auto_steer       = u_p + u_i + u_d # NOTE: P-ctrl only for demo
 	    # Control Effort
 	    self.steerAngle  = auto_steer	
 	    self.linearSpeed = self.straight_speed
 	
 	# ~ III. Transition Determination ~
-	if 0.3 < ( float( self.lastScanNP[0] ) - self.old_right_mean ):
-	    self.state = self.STATE_blind_rght_turn
-	else:
-	    self.state = self.STATE_forward
-	
-	# ~  IV. Clean / Update ~
-	self.old_right_mean = right_mean
+	# if 0.8 < ( rightMost - self.prev_rghtmost ):
+	if self.FLAG_goodScan:
+            self.state  = self.STATE_forward
+            self.reason = "OVER_THRESH"
+        else:
+            self.state  = self.STATE_pre_turn
+            self.reason = "UNDER_THRESH"
+        
+        # ~  IV. Clean / Update ~
+        self.old_right_mean = right_mean
+        self.prev_rghtmost  = rightMost	
+           
+           
+    def STATE_pre_turn( self ):
+        """ Approaching halway end, watch for corner detector """
+        
+        SHOWDEBUG = 1
+        if SHOWDEBUG:
+            print "STATE_pre_turn" , self.reason        
+        
+        # ~   I. State Calcs   ~
+        cent_of_maxes = self.eval_scan()
+        rightMost  = self.lastScanNP[0]
+        self.rhgt_rolling.add( rightMost )
+        right_mean = np.mean( self.rhgt_rolling )        
+        
+        # ~  II. Set controls  ~
+        self.steerAngle = self.preturn_angle
+        # IDEA: Possible deceleration phase
+        # IDEA: Possible fail condition a time t --> turn!
+        
+        # ~ III. Transition Determination ~
+        if self.FLAG_goodScan:
+            self.state  = self.STATE_forward
+            self.reason = "OVER_THRESH"
+        else:        
+            # if self.crnr_drop_dist < ( float( self.lastScanNP[-1] ) - self.old_right_mean ): # NOTE: Scan is CW on the RealSense
+            # if self.crnr_drop_dist < ( right_mean - self.old_right_mean ): # NOTE: Scan is CW on the RealSense
+            # if self.crnr_drop_dist < ( rightMost - self.prev_rghtmost ):
+            if self.crnr_drop_dist < ( rightMost - right_mean ):	    
+                self.state = self.STATE_blind_rght_turn
+                self.reason = "CORNER_DROP"
+            else:
+                self.state = self.STATE_pre_turn
+                self.reason = "UNDER_THRESH"
+            
+        # ~  IV. Clean / Update ~  
+        self.prev_rghtmost  = rightMost
+        self.old_right_mean = right_mean
        
     def STATE_blind_rght_turn( self ):
 	""" Turn right at a preset radius until a clear straightaway signal is present """
 	
 	SHOWDEBUG = 1
 	if SHOWDEBUG:
-	    print "STATE_blind_rght_turn"
+	    print "STATE_blind_rght_turn" , self.reason
 	
 	# ~   I. State Calcs   ~
 	self.eval_scan() # Assess straight-line driving	
@@ -268,9 +391,11 @@ class CarFSM:
 	
 	# ~ III. Transition Determination ~
 	if self.FLAG_goodScan:
-	    self.state = self.STATE_forward
-	else:
-	    self.state = self.STATE_blind_rght_turn
+            self.state  = self.STATE_forward
+            self.reason = "OVER_THRESH"
+        else:
+            self.state  = self.STATE_blind_rght_turn
+            self.reason = "UNDER_THRESH"
 	
 	# ~  IV. Clean / Update ~
 	# NONE
@@ -297,6 +422,19 @@ class CarFSM:
         
     # ___ END FSM __________________________________________________________________________________________________________________________
         
+    def dampen_micro_cmds( self ):
+        """ Check to see if the new steering angle is large enough to warrant a command this prevents micro commands to the servo
+            True  : There is a sufficiently different command to publish
+            False : Microcommand, do not publish """
+        if  ( np.abs( self.steerAngle - self.prevSteerAngle ) > self.angleDiffMin )  or  ( not eq_margin( self.linearSpeed , self.prevLinarSpeed ) ) \
+	    or ( rospy.Time.now().to_sec() - self.initTime < 0.25 ):
+	    
+            self.prevSteerAngle = self.steerAngle
+            self.prevLinarSpeed = self.linearSpeed
+            self.FLAG_newCtrl   = True
+        else:
+            self.FLAG_newCtrl = False    
+        
     def run( self ):
         """ Take a laser reading and generate a control signal """
         
@@ -310,11 +448,13 @@ class CarFSM:
             # 2. Generate a control effort -- should probably have a method for switching between control methods that's better than commenting
             # self.wall_follow_state() 
             self.hallway_FSM()
+	    self.dampen_micro_cmds()
             
             # 3. Transmit the control effort
             if 1:
-		print "Steering Angle:" , self.steerAngle , ", Linear Speed:" , self.linearSpeed
-                self.drive_pub.publish(  compose_ack_ctrl_msg( self.steerAngle , self.linearSpeed )  )
+		# print "Steering Angle:" , self.steerAngle , ", Linear Speed:" , self.linearSpeed
+		if self.FLAG_newCtrl:
+		    self.drive_pub.publish(  compose_ack_ctrl_msg( self.steerAngle , self.linearSpeed )  )
             
             # N-1: Wait until the node is supposed to fire next
             self.idle.sleep()        
@@ -401,6 +541,8 @@ class CarFSM:
 
         print 'translation error:' , translation_err , 'steer:' , self.steerAngle
         # ~ robot.move(steering_angle, speed)    
+
+# _ End Ctrl _
 
 # __ End Class __
 
