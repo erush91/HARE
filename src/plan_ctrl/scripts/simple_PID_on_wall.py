@@ -34,6 +34,7 @@ def prepend_dir_to_path( pathName ): sys.path.insert( 0 , pathName ) # Might nee
 # ~~~ Imports ~~~
 # ~~ Standard ~~
 from math import pi , sqrt , sin , cos
+
 # ~~ Special ~~
 import numpy as np
 import rospy
@@ -162,7 +163,6 @@ class CarFSM:
         self.scanCenter      = int(self.numReadings//2)
         self.lastScan        = [ 0.0 for i in range( self.numReadings ) ]
         self.lastScanNP      = np.asarray( self.lastScan )
-        self.FLAG_estop = False
 
         # 4. Start publishers
         try:
@@ -209,9 +209,8 @@ class CarFSM:
         self.Tstate = 0
 
         # RC_Control vars
-        self.rc_throttle = 0
-        self.rc_steering = 0
-        self.rc_ctrl_ovrd = 0
+        self.rc_throttle = 0.0
+        self.rc_steering = 0.0
         self.rc_throttle_max = 2000
         self.rc_throttle_mid = 1500
         self.rc_throttle_min = 1000
@@ -220,7 +219,7 @@ class CarFSM:
         self.rc_steering_min = 1000
         self.FLAG_estop = False
         self.FLAG_rc_ovrd = False
-
+        self.throttle_scale = .5
 
     def scan_cb( self , msg ):
         """ Process the scan that comes back from the scanner """
@@ -235,16 +234,6 @@ class CarFSM:
 
     def rc_cb( self , msg ):
         self.rc_msg = msg
-
-        # Place a deadband around throttle
-        band = 50
-        if ((self.rc_msg.values[2] < self.rc_throttle_mid + band) and (self.rc_msg.values[2] > self.rc_throttle_mid - band)):
-            self.throttle = 0
-        else:
-            # Scale the incoming pwm signals to usable control commands
-            self.rc_throttle = (self.rc_msg.values[2] - self.rc_throttle_mid)/(self.rc_throttle_max - self.rc_throttle_min)
-
-        self.rc_steering = (math.pi/2)*(self.rc_msg.values[1] - self.rc_steering_mid)/(self.rc_steering_max - self.rc_steering_min)
 
         # Check for rc control override
         if self.rc_msg.values[6] > 1500:
@@ -261,6 +250,15 @@ class CarFSM:
         else:
             self.FLAG_estop = False
 
+        # Place a deadband around throttle
+        band = 50
+        if ((self.rc_msg.values[2] < (self.rc_throttle_mid + band)) and (self.rc_msg.values[2] > (self.rc_throttle_mid - band))):
+            self.rc_throttle = 0
+        else:
+            # Scale the incoming pwm signals to usable control commands
+            self.rc_throttle = ((self.rc_msg.values[2] - self.rc_throttle_mid)/(self.rc_throttle_max - self.rc_throttle_min))*self.throttle_scale
+
+        self.rc_steering = round((pi/2)*(self.rc_msg.values[0] - self.rc_steering_mid)/(self.rc_steering_max - self.rc_steering_min),2)
 
 
     # === DRIVE FINITE STATE MACHINE =======================================================================================================
@@ -568,10 +566,11 @@ class CarFSM:
                 self.drive_pub.publish(  compose_HARE_ctrl_msg( self.steerAngle , self.linearSpeed )  )
 
             # 2. Transmit the control effort
-            if self.FLAG_newCtrl:
+            if (self.FLAG_newCtrl and not self.FLAG_rc_ovrd):
                 #print( "Steering Angle:" , self.steerAngle , ", Speed:" , self.linearSpeed )
-
                 self.drive_pub.publish(  compose_HARE_ctrl_msg( self.steerAngle , self.linearSpeed )  )
+            elif (self.FLAG_rc_ovrd):
+                self.drive_pub.publish(  compose_HARE_ctrl_msg( self.rc_steering , self.rc_throttle )  )
 
             # N-1: Wait until the node is supposed to fire next
             self.idle.sleep()
