@@ -208,6 +208,19 @@ class CarFSM:
         self.t_last = rospy.Time.now().to_sec()
         self.Tstate = 0
 
+        # RC_Control vars
+        self.rc_throttle = 0
+        self.rc_steering = 0
+        self.rc_ctrl_ovrd = 0
+        self.rc_throttle_max = 2000
+        self.rc_throttle_mid = 1500
+        self.rc_throttle_min = 1000
+        self.rc_steering_max = 2000
+        self.rc_steering_mid = 1500
+        self.rc_steering_min = 1000
+        self.FLAG_estop = False
+        self.FLAG_rc_ovrd = False
+
 
     def scan_cb( self , msg ):
         """ Process the scan that comes back from the scanner """
@@ -222,6 +235,25 @@ class CarFSM:
 
     def rc_cb( self , msg ):
         self.rc_msg = msg
+
+        # Place a deadband around throttle
+        band = 50
+        if ((self.rc_msg.values[2] < self.rc_throttle_mid + band) and (self.rc_msg.values[2] > self.rc_throttle_mid - band)):
+            self.throttle = 0
+        else:
+            # Scale the incoming pwm signals to usable control commands
+            self.rc_throttle = (self.rc_msg.values[2] - self.rc_throttle_mid)/(self.rc_throttle_max - self.rc_throttle_min)
+
+        self.rc_steering = (math.pi/2)*(self.rc_msg.values[1] - self.rc_steering_mid)/(self.rc_steering_max - self.rc_steering_min)
+
+        # Check for rc control override
+        if self.rc_msg.values[6] > 1500:
+            rospy.loginfo_throttle(1,"MANUAL RC CONTROL ACTIVE")
+            self.FLAG_rc_ovrd = True
+        else:
+            self.FLAG_rc_ovrd = False
+
+        # Check for e-stop
         if self.rc_msg.values[7] > 1500:
             # INITIALIZE E-STOP
             rospy.loginfo_throttle(1,"E_STOP ACTIVE")
@@ -531,7 +563,7 @@ class CarFSM:
                 self.test_state()
 
             if self.FLAG_estop:
-                rospy.loginfo("estop")
+                rospy.loginfo_throttle(1, "ESTOP ENGAGED")
                 self.linearSpeed = 0.0
                 self.drive_pub.publish(  compose_HARE_ctrl_msg( self.steerAngle , self.linearSpeed )  )
 
