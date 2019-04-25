@@ -109,6 +109,27 @@ def eq_margin( op1 , op2 , margin = EPSILON ):
     """ Return true if op1 and op2 are within 'margin' of each other, where 'margin' is a positive real number """
     return abs( op1 - op2 ) <= margin
 
+def avg_filter( inLst , width = 3 ):
+    """ Return a version of 'inLst' that is the average of 'width' values centered at each index """
+    # NOTE: This function always applies a window width of at least 3
+    lstLen = len( inLst )
+    fltLst = []
+    if width < 3:
+	width = 3
+    elif width % 2 == 0:
+	width -= 1
+    half = max( 1 , width//2  )
+    for i in xrange( lstLen ):
+	mnDex = max( 0        , i-half   )
+	mxDex = min( lstLen   , i+half+1 )
+	fltLst.append( sum( inLst[ mnDex:mxDex ] ) * 1.0 / ( mxDex - mnDex ) )
+    return fltLst
+
+def max_dex( numLst ):
+    """ Return the maximum index , First incidence """
+    # NOTE: This function assumes that 'numLst' has only numeric elements
+    return numLst.index( max( numLst ) )
+
 # __ End Func __
 
 
@@ -324,6 +345,8 @@ class CarFSM:
             print
         # 3. Return the center of the above-threshold values
         return np.mean( self.above_thresh )
+    
+    
 
     def scan_occluded( self ):
 	""" Return True if the last scan has more than the designated number of very-near readings """
@@ -400,6 +423,18 @@ class CarFSM:
 		    rateChange = 0.0
 		rateTot   += rateChange
 	    return rateTot / self.slope_window
+	
+    def steer_center( self , reverse = 0 ):
+	""" PID Controller on the max value of the scan , Return steering command """
+	filtScan = avg_filter( self.lastScanNP )
+	centrDex = max_dex( filtScan )
+	if reverse:
+	    factor = -1.0
+	else:
+	    factor =  1.0
+	# FIXME: PID CTRL
+	    
+	
 
     """
     STATE_funcname
