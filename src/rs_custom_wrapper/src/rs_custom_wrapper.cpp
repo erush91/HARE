@@ -9,22 +9,16 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include <ros/ros.h>
-
 #include "std_msgs/String.h"
 #include "std_msgs/Float32MultiArray.h"
-
-// Used rs-imshow as a go-by
 #include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
 #include <opencv2/opencv.hpp>   // Include OpenCV API
-
 #include <iostream>
-
 #include <cv_bridge/cv_bridge.h> // Bridge between OpenCV and ROS
-
 #include <librealsense2/rs.hpp>
 #include <librealsense2/rs_advanced_mode.hpp>
-
 #include "rs_custom_wrapper/rs_custom_wrapper.h"
+#include <sensor_msgs/Imu.h>
 
 // https://stackoverflow.com/questions/19331575/cout-and-endl-errors
 using std::cout;
@@ -59,8 +53,9 @@ int main(int argc, char * argv[]) try
     int COLOR_HEIGHT = 480;
     int COLOR_FPS = 30;
 
-    nh_.param("CV_IMSHOW_VISUALIZER_FLAG", CV_IMSHOW_VISUALIZER_FLAG, CV_IMSHOW_VISUALIZER_FLAG);
+    bool IMU_FLAG = 0;
 
+    nh_.param("CV_IMSHOW_VISUALIZER_FLAG", CV_IMSHOW_VISUALIZER_FLAG, CV_IMSHOW_VISUALIZER_FLAG);
     nh_.param("DEPTH_RGB_FLAG", DEPTH_RGB_FLAG, DEPTH_RGB_FLAG);
     
     if( 1 ) // DIRTY HACK
@@ -84,6 +79,8 @@ int main(int argc, char * argv[]) try
     nh_.param("COLOR_WIDTH", COLOR_WIDTH, COLOR_WIDTH);
     nh_.param("COLOR_HEIGTH", COLOR_HEIGHT, COLOR_HEIGHT);
     nh_.param("COLOR_FPS", COLOR_FPS, COLOR_FPS);
+
+    nh_.param("IMU_FLAG", IMU_FLAG, IMU_FLAG);
 
     //////////////////////////
     // INITIALIZE REALSENSE //
@@ -110,6 +107,13 @@ int main(int argc, char * argv[]) try
 
     // Configured depth stream
     cfg.enable_stream(RS2_STREAM_DEPTH, DEPTH_WIDTH, DEPTH_HEIGHT, RS2_FORMAT_Z16, DEPTH_FPS);
+
+    // Configured IMU stream
+    if (IMU_FLAG)
+    {
+        cfg.enable_stream(RS2_STREAM_GYRO, RS2_FORMAT_MOTION_XYZ32F);
+        cfg.enable_stream(RS2_STREAM_ACCEL, RS2_FORMAT_MOTION_XYZ32F);
+    }
 
     // Configured left infrared stream
     // https://github.com/IntelRealSense/librealsense/issues/1140
@@ -203,6 +207,9 @@ int main(int argc, char * argv[]) try
     ros::Publisher pub_image_infrared_left = nh_.advertise<sensor_msgs::Image>("/camera/infra1/image_rect_raw", 1);
     ros::Publisher pub_image_infrared_right = nh_.advertise<sensor_msgs::Image>("/camera/infra2/image_rect_raw", 1);
 
+    // Setup IMU publisher
+    ros::Publisher pub_imu = nh_.advertise<sensor_msgs::Imu>("/imu/raw", 1);
+    
     // Pre-allocate the depth matrix and message
     cv::Mat mat_depth_meters(Size(DEPTH_WIDTH, DEPTH_HEIGHT), CV_32FC1);
 
@@ -235,6 +242,32 @@ int main(int argc, char * argv[]) try
         
         // Wait for next set of frames from the camera
         rs2::frameset frame_set = pipe.wait_for_frames();
+
+        // Find and retrieve IMU and/or tracking data
+        if(IMU_FLAG)
+        {
+            sensor_msgs::Imu imu_msg;
+
+            if (rs2::motion_frame accel_frame = frame_set.first_or_default(RS2_STREAM_ACCEL))
+            {
+                // linear acceleration
+                rs2_vector accel_sample = accel_frame.get_motion_data();
+                imu_msg.linear_acceleration.x = accel_sample.x;
+                imu_msg.linear_acceleration.y = accel_sample.y;
+                imu_msg.linear_acceleration.z = accel_sample.z;
+            }
+        
+            if (rs2::motion_frame gyro_frame = frame_set.first_or_default(RS2_STREAM_GYRO))
+            {
+                // angular velocity
+                rs2_vector gyro_sample = gyro_frame.get_motion_data();
+                imu_msg.angular_velocity.x = gyro_sample.x;
+                imu_msg.angular_velocity.y = gyro_sample.y;
+                imu_msg.angular_velocity.z = gyro_sample.z;
+            }
+
+            pub_imu.publish(imu_msg);
+        }
 
         if(DEPTH_FLAG)
         {
