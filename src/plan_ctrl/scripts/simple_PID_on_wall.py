@@ -460,6 +460,7 @@ class CarFSM:
 
     def STATE_init( self ):
         """ Initial state , Determine the drving mode """
+        self.one_shot = True # only used for throttle authority test, delete after test !!!!!!!!!!!!!!!!!!
 
         SHOWDEBUG = 0
         if SHOWDEBUG:
@@ -516,7 +517,18 @@ class CarFSM:
             # Control Effort
             self.steerAngle  = auto_steer
             # self.steerAngle  = -auto_steer
-            self.linearSpeed = self.straight_speed
+            # self.linearSpeed = self.straight_speed # uncomment when finished with throttle authority test !!!!!!!!!!!!!!!!!!!!!!!!!!
+            
+            ############ throttle authority test ####################
+            if self.one_shot:
+			    self.st = rospy.Time.now().to_sec()
+			    self.one_shot = False
+            # print(rospy.Time.now().to_sec()-self.st)
+            if rospy.Time.now().to_sec() - self.st < 2.0:
+                self.linearSpeed = 1.0
+            else: 
+                self.linearSpeed = 0.0
+		    ############ throttle authority test ####################
 
         # ~ III. Transition Determination ~
         if self.FLAG_goodScan:
@@ -574,7 +586,7 @@ class CarFSM:
         # ~  IV. Clean / Update ~
         self.prev_rghtmost  = rightMost
         self.old_right_mean = right_mean
-
+        
 
     def STATE_blind_rght_turn( self ):
         """ Turn right at a preset radius until a clear straightaway signal is present """
