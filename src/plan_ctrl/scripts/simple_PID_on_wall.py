@@ -186,7 +186,7 @@ class CarFSM:
         self.num_right_scans =   5
         self.old_right_mean  =   0.0 # np.ones((self.num_right_scans))*20
         self.prev_rghtmost   =   0.0
-        self.scanCenter      = int( self.numReadings//2 )
+        self.scanCenter      = int( self.numReadings//2 ) # + 5 # Cetner of scan with an offset
         self.lastScan        = [ 0.0 for i in range( self.numReadings ) ]
         self.lastScanNP      = np.asarray( self.lastScan )
 
@@ -316,12 +316,12 @@ class CarFSM:
 	self.max_thresh_dist = 9.0 # ---------- Above this value we consider distance to be maxed out [m]
 	self.thresh_count    = 5 # ------------ If there are at least this many readings above 'self.max_thresh_dist'	
 	# STATE_preturn
-	self.preturn_angle  = 0.02 # Hard-coded turn angle for preturn
+	self.preturn_angle  = 0.5 # Hard-coded turn angle for preturn
 	# TODO: control during preturn to 
 	self.crnr_drop_dist = 0.65 # Increase in distance of the rightmost reading that will cause transition to the turn state
 	# STATE_blind_right_turn
         self.turning_speed = 0.08 # Speed for 'STATE_blind_rght_turn'
-        self.turning_angle = 1.20 # Turn angle for 'STATE_blind_rght_turn'
+        self.turning_angle = 1.5 # Turn angle for 'STATE_blind_rght_turn'
 	# STATE_collide_recover
 	self.recover_speed    = -0.10 # Back up at this speed
 	self.recover_duration =  1.50 # Minimum time to recover
@@ -430,7 +430,7 @@ class CarFSM:
 	""" Clear the PID history left by a previous state """
 	self.err_hist = [ 0 for i in range( self.err_hist_window ) ] 
 	self.tim_hist = [ 0 for i in range( self.err_hist_window ) ] 
-	self.rhgt_rolling.zero_out()
+	#self.rhgt_rolling.zero_out()
 	
     def steer_center( self , reverse = 0 ):
 	""" PID Controller on the max value of the scan , Return steering command """

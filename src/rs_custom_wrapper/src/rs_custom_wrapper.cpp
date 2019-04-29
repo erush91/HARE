@@ -111,8 +111,8 @@ int main(int argc, char * argv[]) try
     // Configured IMU stream
     if (IMU_FLAG)
     {
-        cfg.enable_stream(RS2_STREAM_GYRO, RS2_FORMAT_MOTION_XYZ32F);
-        cfg.enable_stream(RS2_STREAM_ACCEL, RS2_FORMAT_MOTION_XYZ32F);
+        cfg.enable_stream(RS2_STREAM_GYRO, RS2_FORMAT_MOTION_RAW);
+        cfg.enable_stream(RS2_STREAM_ACCEL, RS2_FORMAT_MOTION_RAW);
     }
 
     // Configured left infrared stream
