@@ -21,34 +21,30 @@ print "==================================================================="
 
 class ListRoll( list ):
     """ Rolling List """
-    
+
     def __init__( self , pLength ):
         """ Create a list with a marker for the current index """
-        self.lst     = [ 0 for i in xrange( pLength ) ]
+        list.__init__( self , [ 0 for i in xrange( pLength ) ] )
         self.length  = pLength
         self.currDex = 0
-        
+
     def add( self , element ):
         """ Insert the element at the current index and increment index """
-        self.lst[ self.currDex ] = element
+        self[ self.currDex ] = element
         self.currDex = ( self.currDex + 1 ) % self.length
-        
-#    def get_subarr( self , bgnDex , endDex ):
-#        """ Get the wrapping slice beginning at 'bgnDex' and ending with 'endDex-1', inclusive """
-#        # NOTE: This function assumes 'bgnDex < endDex == True'
-#        rtnSlice = []
-#        currDex  = bgnDex
-#        while currDex < endDex:
-#            rtnSlice.append(  )
-        
-        
-        
+	
+    def zero_out( self ):
+	""" Set numeric data and index to zero """
+	self.__init__( self.length )
         
 testArr = ListRoll( 5 )
 
-for i in xrange(1,21):
-    testArr.add(i)
+for i in xrange( 1 , 21 ):
+    testArr.add( i )
     print testArr , ',' , len( testArr ) , sum( testArr )
+    
+testArr.zero_out()
+print testArr
         
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
