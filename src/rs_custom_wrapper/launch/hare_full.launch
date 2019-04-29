@@ -25,9 +25,11 @@
     <param name="ANGLE_DIFF_MIN" type="double" value="0.196"/> <!-- pi/16 = 0.196 -->
     
     <!-- param name="P_VALUE" type="double" value="1.0000"/ --> <!-- 'wall_follow_state' controls on "meters" -->
-    <param name="P_VALUE" type="double" value="0.0500"/> <!-- 'hallway_FSM' controls on "indices" -->
+    <!-- param name="P_VALUE" type="double" value="0.0500"/ --> <!-- 'hallway_FSM' controls on "indices" -->
+    <param name="P_VALUE" type="double" value="0.0300"/>
     <param name="I_VALUE" type="double" value="0.0000"/>
-    <param name="D_VALUE" type="double" value="0.0160"/>
+    <param name="D_VALUE" type="double" value="0.0000"/>
+    <!-- param name="D_VALUE" type="double" value="0.0160"/ -->
   
     <!-- Start Planner -->
     <node name="CarFSM" pkg="plan_ctrl" type="simple_PID_on_wall.py" output="screen" />
