@@ -79,6 +79,7 @@ if __name__=="__main__":
                 command_out.steering_angle = turn
 
             command_out.throttle_cmd = mode*speed
+
             command_out.throttle_mode = mode
             pub.publish(command_out)
 

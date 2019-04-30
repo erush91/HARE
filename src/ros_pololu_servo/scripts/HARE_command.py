@@ -23,8 +23,8 @@ def cmd_cb( msg ):
     # Limit the incoming throttle command
     if msg.throttle_cmd > 1:
         msg.throttle_cmd = 1
-    elif msg.throttle_cmd < 0:
-        msg.throttle_cmd = 0.0
+    elif msg.throttle_cmd < -1:
+        msg.throttle_cmd = -1
 
     # Handle throttle mode
     if msg.throttle_mode == 0:
