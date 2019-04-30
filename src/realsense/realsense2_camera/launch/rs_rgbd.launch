@@ -67,9 +67,9 @@ Processing enabled by this node:
   <arg name="infra1_fps"          default="30"/>
   <arg name="infra2_fps"          default="30"/>
   <arg name="color_fps"           default="30"/>
-  <arg name="gyro_fps"            default="1000"/>
-  <arg name="accel_fps"           default="1000"/>
-  <arg name="enable_imu"          default="false"/>
+  <arg name="gyro_fps"            default="500"/>
+  <arg name="accel_fps"           default="500"/>
+  <arg name="enable_imu"          default="true"/>
 
   <arg name="enable_pointcloud"   default="false"/>
   <arg name="enable_sync"         default="true"/>
