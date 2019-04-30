@@ -329,7 +329,8 @@ class CarFSM:
         self.right_side_boost = 2.0
         self.preturn_angle  = 0.5 # Hard-coded turn angle for preturn
         self.turns_cent_setpoint = int( self.numReadings/2 ) - 25 # Center of scan with an offset, a positive addition should push the car left
-        self.K_p_turn = self.K_p            
+        self.K_p_turn = self.K_p       
+        self.preturn_speed = 0.05 # Speed for 'STATE_preturn' # 0.2 is a fast jog/run
         # TODO: control during preturn to 
         self.crnr_drop_dist = 0.65 # Increase in distance of the rightmost reading that will cause transition to the turn state
         # STATE_blind_right_turn
@@ -603,6 +604,7 @@ class CarFSM:
             self.currUp      = self.K_p_turn * translation_err
             auto_steer       = self.currUp
             self.steerAngle  = auto_steer # Control Effort
+			self.linearSpeed = self.preturn_speed 
 
         # IDEA: Possible deceleration phase
 
