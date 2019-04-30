@@ -115,14 +115,14 @@ def avg_filter( inLst , width = 3 ):
     lstLen = len( inLst )
     fltLst = []
     if width < 3:
-	width = 3
+        width = 3
     elif width % 2 == 0:
-	width -= 1
+        width -= 1
     half = max( 1 , width//2  )
     for i in xrange( lstLen ):
-	mnDex = max( 0        , i-half   )
-	mxDex = min( lstLen   , i+half+1 )
-	fltLst.append( sum( inLst[ mnDex:mxDex ] ) * 1.0 / ( mxDex - mnDex ) )
+        mnDex = max( 0        , i-half   )
+        mxDex = min( lstLen   , i+half+1 )
+        fltLst.append( sum( inLst[ mnDex:mxDex ] ) * 1.0 / ( mxDex - mnDex ) )
     return fltLst
 
 def max_dex( numLst ):
@@ -150,10 +150,10 @@ class ListRoll( list ):
         """ Insert the element at the current index and increment index """
         self[ self.currDex ] = element
         self.currDex = ( self.currDex + 1 ) % self.length
-	
+    
     def zero_out( self ):
-	""" Set numeric data and index to zero """
-	self.__init__( self.length )
+        """ Set numeric data and index to zero """
+        self.__init__( self.length )
 
 # _ End Util _
 
@@ -180,7 +180,7 @@ class CarFSM:
         rospy.Subscriber( "/rc_raw", RCRaw, self.rc_cb )
         self.rc_msg = RCRaw()
         # self.FLAG_ = False
-	
+    
         # 3.5. Init scan math
         self.numReadings     = 100
         self.num_right_scans =   5
@@ -219,18 +219,22 @@ class CarFSM:
         self.t_last = rospy.Time.now().to_sec()
         self.Tstate = 0
 
-        # RC_Control vars
-        self.rc_throttle = 0.0
-        self.rc_steering = 0.0
+        # 9. RC_Control vars
+        # Throttle
+        self.rc_throttle     =    0.0
+        self.throttle_scale  =    0.5
         self.rc_throttle_max = 2000
         self.rc_throttle_mid = 1500
         self.rc_throttle_min = 1000
+        # Steering
+        self.rc_steering     =    0.0
         self.rc_steering_max = 2000
         self.rc_steering_mid = 1500
         self.rc_steering_min = 1000
-        self.FLAG_estop = False
+        # Flags
+        self.FLAG_estop   = False
         self.FLAG_rc_ovrd = False
-        self.throttle_scale = 0.5
+        
 
     def scan_cb( self , msg ):
         """ Process the scan that comes back from the scanner """
@@ -269,41 +273,41 @@ class CarFSM:
         self.rc_steering = round((pi/2)*(self.rc_msg.values[0] - self.rc_steering_mid)/(self.rc_steering_max - self.rc_steering_min),2)
 
     def reset_time( self ):
-	""" Set 'initTime' to the current time """
-	self.initTime = rospy.Time.now().to_sec() # Time that the node was "started"
+        """ Set 'initTime' to the current time """
+        self.initTime = rospy.Time.now().to_sec() # Time that the node was "started"
 
     # === DRIVE FINITE STATE MACHINE =======================================================================================================
 
     def set_FSM_vars( self ):
         """ Set the variables necessary for the FSM controller """
 
-	# ~ Control Output ~
-	self.FLAG_newCtrl   = False # Flag for whether we accept the new control signal
-	self.steerAngle     = 0.0
-	self.prevSteerAngle = 0.0
-	self.prevLinarSpeed = 0.0
-	self.angleDiffMin   = rospy.get_param( "ANGLE_DIFF_MIN" ) # limits micro commands
-	self.linearSpeed    = rospy.get_param( "LINEAR_SPEED"   ) # [ -1 ,  1 ]	
-	
-	# ~ Driving Vars ~
-	self.err_hist_window = 25 # Width of the integration window
-	self.err_hist        = [ 0 for i in range( self.err_hist_window ) ] # Integration window
-	self.tim_hist        = [ 0 for i in range( self.err_hist_window ) ] # Integration window
-	self.wallSetPnt      =  1.0 # [m]
-	self.nearN           = 30 # Count this many points as near the average
-	self.slope_window    =  2 # Look this many points in the past to compute slope
-	self.rhgt_rolling    = ListRoll( self.num_right_scans )		
+        # ~ Control Output ~
+        self.FLAG_newCtrl   = False # Flag for whether we accept the new control signal
+        self.steerAngle     = 0.0
+        self.prevSteerAngle = 0.0
+        self.prevLinarSpeed = 0.0
+        self.angleDiffMin   = rospy.get_param( "ANGLE_DIFF_MIN" ) # limits micro commands
+        self.linearSpeed    = rospy.get_param( "LINEAR_SPEED"   ) # [ -1 ,  1 ]    
+        
+        # ~ Driving Vars ~
+        self.err_hist_window = 25 # Width of the integration window
+        self.err_hist        = [ 0 for i in range( self.err_hist_window ) ] # Integration window
+        self.tim_hist        = [ 0 for i in range( self.err_hist_window ) ] # Integration window
+        self.wallSetPnt      =  1.0 # [m]
+        self.nearN           = 30 # Count this many points as near the average
+        self.slope_window    =  2 # Look this many points in the past to compute slope
+        self.rhgt_rolling    = ListRoll( self.num_right_scans )        
 
         # ~ FSM Vars ~
         self.state           = self.STATE_init # Currently-active state, the actual function
         self.seq             =  0 # ------------ Sequence number to give ROS
         self.FLAG_goodScan   = False # --------- Was the last scan appropriate for straight-line driving
         self.reason          = "INIT" # -------- Y U change state?
-	self.occlude_dist    =  0.25 # --------- Maximum distance for which a scan reading is considered occluded
-	self.occlude_limit   = 33 # ------------ Minimum number of occluded scan readings that indicate view occlusion
-	self.occlude_indices = [] # ------------ Currently occluded indices
-	self.FLAG_backup     = False # --------- Flag set at the beginning of the recovery phase
-	self.rcovr_bgn_time  = 0.0
+        self.occlude_dist    =  0.25 # --------- Maximum distance for which a scan reading is considered occluded
+        self.occlude_limit   = 33 # ------------ Minimum number of occluded scan readings that indicate view occlusion
+        self.occlude_indices = [] # ------------ Currently occluded indices
+        self.FLAG_backup     = False # --------- Flag set at the beginning of the recovery phase
+        self.rcovr_bgn_time  = 0.0
 
         # ~ PID Vars ~
         self.currUp = 0.0
@@ -311,23 +315,23 @@ class CarFSM:
         self.currUd = 0.0
 
         # ~ State-Specific Constants ~
-	# STATE_forward
+        # STATE_forward
         self.straight_speed  = 0.16 # Speed for 'STATE_forward'
-	self.max_thresh_dist = 9.0 # ---------- Above this value we consider distance to be maxed out [m]
-	self.thresh_count    = 5 # ------------ If there are at least this many readings above 'self.max_thresh_dist'	
-	# STATE_preturn
-	self.preturn_angle  = 0.5 # Hard-coded turn angle for preturn
-	# TODO: control during preturn to 
-	self.crnr_drop_dist = 0.65 # Increase in distance of the rightmost reading that will cause transition to the turn state
-	# STATE_blind_right_turn
+        self.max_thresh_dist = 9.0 # ---------- Above this value we consider distance to be maxed out [m]
+        self.thresh_count    = 5 # ------------ If there are at least this many readings above 'self.max_thresh_dist'    
+        # STATE_preturn
+        self.preturn_angle  = 0.5 # Hard-coded turn angle for preturn
+        # TODO: control during preturn to 
+        self.crnr_drop_dist = 0.65 # Increase in distance of the rightmost reading that will cause transition to the turn state
+        # STATE_blind_right_turn
         self.turning_speed = 0.08 # Speed for 'STATE_blind_rght_turn'
         self.turning_angle = 1.5 # Turn angle for 'STATE_blind_rght_turn'
-	# STATE_collide_recover
-	self.recover_speed    = -0.10 # Back up at this speed
-	self.recover_duration =  1.50 # Minimum time to recover
-	self.recover_timeout  = 10.00 # Maximum time to recover
-	# STATE_seek_open 
-	self.seek_speed = 0.10 # Creep forward at this speed
+        # STATE_collide_recover
+        self.recover_speed    = -0.10 # Back up at this speed
+        self.recover_duration =  1.50 # Minimum time to recover
+        self.recover_timeout  = 10.00 # Maximum time to recover
+        # STATE_seek_open 
+        self.seek_speed = 0.10 # Creep forward at this speed
 
     def eval_scan( self ):
         """ Populate the threshold array and return its center """
@@ -351,16 +355,16 @@ class CarFSM:
         return np.mean( self.above_thresh )
 
     def scan_occluded( self ):
-	""" Return True if the last scan has more than the designated number of very-near readings """
-	# NOTE: This function assumes that eval_scan has already been run
-	SHOWDEBUG = 0
-	# 1. Determine which scan values are above the threshold
-	self.occlude_indices = np.where( self.lastScanNP <= self.occlude_dist )[0]
-	# 2. Predicate: Was the latest scan a good scan?
-	if len( self.occlude_indices ) >= self.occlude_limit:
-	    return True
-	else:
-	    return False	
+        """ Return True if the last scan has more than the designated number of very-near readings """
+        # NOTE: This function assumes that eval_scan has already been run
+        SHOWDEBUG = 0
+        # 1. Determine which scan values are above the threshold
+        self.occlude_indices = np.where( self.lastScanNP <= self.occlude_dist )[0]
+        # 2. Predicate: Was the latest scan a good scan?
+        if len( self.occlude_indices ) >= self.occlude_limit:
+            return True
+        else:
+            return False    
 
     def report_state( self ):
         """ Accumulate and publish controller state """
@@ -377,9 +381,9 @@ class CarFSM:
         msg.FLAG_goodScan   = self.FLAG_goodScan #- Was there a good scan noted this timestep?
         msg.steerAngle      = self.steerAngle  # -- Steering angle demanded
         msg.linearSpeed     = self.linearSpeed  # - Motor speed demanded
-        msg.up              = self.currUp 
-        msg.ui              = self.currUi
-        msg.ud              = self.currUd
+        msg.up              = self.currUp # ------- Proportional part of the control signal
+        msg.ui              = self.currUi # ------- Integral part of the control signal
+        msg.ud              = self.currUd # ------- Derivative part of the control signal
         # 3. Publish msg
         self.state_pub.publish( msg )
 
@@ -409,46 +413,46 @@ class CarFSM:
     def rate_err( self ):
         """ Average time rate of change in error over a window """
         method  = 1
-	# A. Average Slope
-	if method:
-	    errChange = self.err_hist[ -1 ] - self.err_hist[ -self.slope_window ]
-	    timChange = sum( self.tim_hist[ -self.slope_window: ] )
-	    return errChange / timChange
-	# B. Average of Slopes
-	else:
-	    rateTot = 0.0
-	    for i in xrange( self.slope_window ):
-		change     = self.err_hist[ -(i) ] - self.err_hist[ -(i+1) ]
-		if self.tim_hist[ -(i) ] > 0:
-		    rateChange = change / self.tim_hist[ -(i) ]
-		else:
-		    rateChange = 0.0
-		rateTot   += rateChange
-	    return rateTot / self.slope_window
-	
+        # A. Average Slope
+        if method:
+            errChange = self.err_hist[ -1 ] - self.err_hist[ -self.slope_window ]
+            timChange = sum( self.tim_hist[ -self.slope_window: ] )
+            return errChange / timChange
+        # B. Average of Slopes
+        else:
+            rateTot = 0.0
+            for i in xrange( self.slope_window ):
+            change     = self.err_hist[ -(i) ] - self.err_hist[ -(i+1) ]
+            if self.tim_hist[ -(i) ] > 0:
+                rateChange = change / self.tim_hist[ -(i) ]
+            else:
+                rateChange = 0.0
+            rateTot   += rateChange
+            return rateTot / self.slope_window
+    
     def clear_PID( self ):
-	""" Clear the PID history left by a previous state """
-	self.err_hist = [ 0 for i in range( self.err_hist_window ) ] 
-	self.tim_hist = [ 0 for i in range( self.err_hist_window ) ] 
-	#self.rhgt_rolling.zero_out()
-	
+        """ Clear the PID history left by a previous state """
+        self.err_hist = [ 0 for i in range( self.err_hist_window ) ] 
+        self.tim_hist = [ 0 for i in range( self.err_hist_window ) ] 
+        #self.rhgt_rolling.zero_out() # 2019-04-29: Causes spurious corner detection, similar to point-to-last comparison
+    
     def steer_center( self , reverse = 0 ):
-	""" PID Controller on the max value of the scan , Return steering command """
-	filtScan = avg_filter( self.lastScanNP )
-	centrDex = max_dex( filtScan )
-	if reverse:
-	    factor = -1.0
-	else:
-	    factor =  1.0
-	# Calc a new effort 
-	translation_err  = self.update_err( centrDex , self.scanCenter )
-	self.currUp      = self.K_p * translation_err
-	self.currUi      = self.K_i * self.integrate_err()
-	self.currUd      = self.K_d * self.rate_err() # This should be a
-	auto_steer       = self.currUp + self.currUi + self.currUd # NOTE: P-ctrl only for demo
-	# Return the total PID steer effort, reversing if 
-	return auto_steer * factor
-	
+        """ PID Controller on the max value of the scan , Return steering command , Reverse negates the command (ex. backwards driving) """
+        filtScan = avg_filter( self.lastScanNP )
+        centrDex = max_dex( filtScan )
+        if reverse:
+            factor = -1.0
+        else:
+            factor =  1.0
+        # Calc a new effort 
+        translation_err  = self.update_err( centrDex , self.scanCenter )
+        self.currUp      = self.K_p * translation_err
+        self.currUi      = self.K_i * self.integrate_err()
+        self.currUd      = self.K_d * self.rate_err() # This should be a
+        auto_steer       = self.currUp + self.currUi + self.currUd # NOTE: P-ctrl only for demo
+        # Return the total PID steer effort, reversing if 
+        return auto_steer * factor
+    
 
     """
     STATE_funcname
@@ -499,7 +503,7 @@ class CarFSM:
         cent_of_maxes = self.eval_scan()
 
         # right_mean    = np.mean( self.lastScanNP[ 0:self.num_right_scans ] )
-        # right_mean    = np.mean( self.lastScanNP[ self.num_right_scans: ] )	# NOTE: Scan is CW on the RealSense
+        # right_mean    = np.mean( self.lastScanNP[ self.num_right_scans: ] )    # NOTE: Scan is CW on the RealSense
         rightMost  = self.lastScanNP[-1]
         self.rhgt_rolling.add( rightMost )
         right_mean = np.mean( self.rhgt_rolling )
@@ -526,17 +530,17 @@ class CarFSM:
         else:
             self.state  = self.STATE_pre_turn
             self.reason = "UNDER_THRESH"
-	# Z. Crash Recover Override
-	if self.scan_occluded():
-	    self.state  = self.STATE_collide_recover
-	    self.reason = "OCCLUSION"	
+        # Z. Crash Recover Override
+        if self.scan_occluded():
+            self.state  = self.STATE_collide_recover
+            self.reason = "OCCLUSION"    
 
         # ~  IV. Clean / Update ~
         self.old_right_mean = right_mean
         self.prev_rghtmost  = rightMost
-	# If we are exiting the state, then clear the PID
-	if self.state != self.STATE_forward:
-	    self.clear_PID()
+        # If we are exiting the state, then clear the PID
+        if self.state != self.STATE_forward:
+            self.clear_PID()
 
     def STATE_pre_turn( self ):
         """ Approaching halway end, watch for corner detector """
@@ -547,14 +551,14 @@ class CarFSM:
 
         # ~   I. State Calcs   ~
         cent_of_maxes = self.eval_scan()
-        rightMost  = self.lastScanNP[-1]
+        rightMost     = self.lastScanNP[-1]
         self.rhgt_rolling.add( rightMost )
         right_mean = np.mean( self.rhgt_rolling )
 
         # ~  II. Set controls  ~
         self.steerAngle = self.preturn_angle
 
-        # IDEA: Possible deceleration phase
+        # IDEA: Possible deceleration phase ??
 
         # ~ III. Transition Determination ~
         if self.FLAG_goodScan:
@@ -567,10 +571,10 @@ class CarFSM:
             else:
                 self.state = self.STATE_pre_turn
                 self.reason = "UNDER_THRESH"
-	# Z. Crash Recover Override
-	if self.scan_occluded():
-	    self.state  = self.STATE_collide_recover
-	    self.reason = "OCCLUSION"		
+        # Z. Crash Recover Override
+        if self.scan_occluded():
+            self.state  = self.STATE_collide_recover
+            self.reason = "OCCLUSION"        
 
         # ~  IV. Clean / Update ~
         self.prev_rghtmost  = rightMost
@@ -598,98 +602,99 @@ class CarFSM:
         else:
             self.state  = self.STATE_blind_rght_turn
             self.reason = "UNDER_THRESH"
-	# Z. Crash Recover Override
-	if self.scan_occluded():
-	    self.state  = self.STATE_collide_recover
-	    self.reason = "OCCLUSION"		    
+        # Z. Crash Recover Override
+        if self.scan_occluded():
+            self.state  = self.STATE_collide_recover
+            self.reason = "OCCLUSION"            
 
         # ~  IV. Clean / Update ~
         # NONE
-	
+    
     def STATE_collide_recover( self ):
-	""" Back up from a collision """
-	
-	# ~   I. State Calcs   ~
-	if not self.FLAG_backup:
-	    self.FLAG_backup    = True
-	    self.rcovr_bgn_time = rospy.Time.now().to_sec()
-	
-	# ~  II. Set controls  ~
-	self.linearSpeed = self.recover_speed
-	# self.steerAngle  = 0.00
-	self.steerAngle  = self.steer_center( reverse = 1 )
-	
-	# ~ III. Transition Determination ~
-	# A. If the min time has not passed, continue to recover
-	nowTime = rospy.Time.now().to_sec()
-	if nowTime - self.rcovr_bgn_time <= self.recover_duration:
-	    self.state  = self.STATE_collide_recover
-	    self.reason = "UNDER_MIN_TIME"	    
-	# B. Else the minimum time has passed
-	else:
-	    # i. If the occlusion has been cleared, then seek open space
-	    if not self.scan_occluded():
-		self.FLAG_backup = False
-		self.eval_scan()
-		# a. If there is an open hallway, GO
-		if self.FLAG_goodScan:
-		    self.state  = self.STATE_forward
-		    self.reason = "OVER_THRESH"
-		# b. Else creep forward
-		else:
-		    self.state  = self.STATE_seek_open
-		    self.reason = "UNDER_THRESH"		
-	    # ii. Else the occlusion has not cleared
-	    else:
-		# iii. If the max time has not elapsed, continue to recover
-		if nowTime - self.rcovr_bgn_time <= self.recover_timeout:
-		    self.state  = self.STATE_collide_recover
-		    self.reason = "OCCLUDED_UNDER_MAX_TIME"		    
-		# iv. If the max time has passed without clearing occlusion, fail to init
-		else:
-		    self.state       = self.STATE_init
-		    self.reason      = "RECOVERY_FAILURE"	
-		    self.FLAG_backup = False
-	
-	# ~  IV. Clean / Update ~	
-	# NONE
-	
+    """ Back up from a collision """
+    
+        # ~   I. State Calcs   ~
+        if not self.FLAG_backup:
+            self.FLAG_backup    = True
+            self.rcovr_bgn_time = rospy.Time.now().to_sec()
+        
+        # ~  II. Set controls  ~
+        self.linearSpeed = self.recover_speed
+        # self.steerAngle  = 0.00
+        self.steerAngle  = self.steer_center( reverse = 1 )
+        
+        # ~ III. Transition Determination ~
+        # A. If the min time has not passed, continue to recover
+        nowTime = rospy.Time.now().to_sec()
+        if nowTime - self.rcovr_bgn_time <= self.recover_duration:
+            self.state  = self.STATE_collide_recover
+            self.reason = "UNDER_MIN_TIME"        
+        # B. Else the minimum time has passed
+        else:
+            # i. If the occlusion has been cleared, then seek open space
+            if not self.scan_occluded():
+                self.FLAG_backup = False
+                self.eval_scan()
+                # a. If there is an open hallway, GO
+                if self.FLAG_goodScan:
+                    self.state  = self.STATE_forward
+                    self.reason = "OVER_THRESH"
+                # b. Else creep forward
+                else:
+                    self.state  = self.STATE_seek_open
+                    self.reason = "UNDER_THRESH"        
+            # ii. Else the occlusion has not cleared
+            else:
+                # iii. If the max time has not elapsed, continue to recover
+                if nowTime - self.rcovr_bgn_time <= self.recover_timeout:
+                    self.state  = self.STATE_collide_recover
+                    self.reason = "OCCLUDED_UNDER_MAX_TIME"            
+                # iv. If the max time has passed without clearing occlusion, fail to init
+                else:
+                    self.state       = self.STATE_init
+                    self.reason      = "RECOVERY_FAILURE"    
+                    self.FLAG_backup = False
+        
+        # ~  IV. Clean / Update ~    
+        # NONE
+    
     def STATE_seek_open( self ):
-	""" Slowly drive towards the most open portion of the scan """
-	# ~   I. State Calcs   ~
-	self.eval_scan()
-	# ~  II. Set controls  ~
-	self.linearSpeed = self.recover_speed
-	self.steerAngle  = self.steer_center()	
-	# ~ III. Transition Determination ~
-	# a. If there is an open hallway, GO
-	if self.FLAG_goodScan:
-	    self.state  = self.STATE_forward
-	    self.reason = "OVER_THRESH"
-	# b. Else creep forward
-	else:
-	    self.state  = self.STATE_seek_open
-	    self.reason = "UNDER_THRESH"	
-	# ~  IV. Clean / Update ~
-	# If we are exiting the state, then clear the PID
-	if self.state != self.STATE_seek_open:
-	    self.clear_PID()
+        """ Slowly drive towards the most open portion of the scan """
+        # ~   I. State Calcs   ~
+        self.eval_scan()
+        # ~  II. Set controls  ~
+        self.linearSpeed = self.seek_speed
+        self.steerAngle  = self.steer_center()    
+        # ~ III. Transition Determination ~
+        # a. If there is an open hallway, GO
+        if self.FLAG_goodScan:
+            self.state  = self.STATE_forward
+            self.reason = "OVER_THRESH"
+        # b. Else creep forward
+        else:
+            self.state  = self.STATE_seek_open
+            self.reason = "UNDER_THRESH"    
+        # ~  IV. Clean / Update ~
+        # If we are exiting the state, then clear the PID
+        if self.state != self.STATE_seek_open:
+            self.clear_PID()
 
     def hallway_FSM( self ):
         """ Execute state actions and record current status """
         # NOTE: Each state must handle its own data collection, processing, control setting, and transition
         self.state() # ------ State actions and transition
-        print self.state.__name__ , ',' , self.reason , ',' , self.steerAngle
+        print self.state.__name__ , ',' , self.reason , ',' , self.steerAngle , ',' , self.linearSpeed
         self.report_state() # Publish state info
 
     # ___ END FSM __________________________________________________________________________________________________________________________
 
     def dampen_micro_cmds( self ):
         """ Check to see if the new steering angle is large enough to warrant a command this prevents micro commands to the servo
-            True  : There is a sufficiently different command to publish
-            False : Microcommand, do not publish """
+            self.FLAG_newCtrl:
+                True  - There is a sufficiently different command to publish
+                False - Microcommand, do not publish """
         if ( np.abs( self.steerAngle - self.prevSteerAngle ) > self.angleDiffMin )  or  ( not eq_margin( self.linearSpeed , self.prevLinarSpeed ) ) \
-	    or ( rospy.Time.now().to_sec() - self.initTime < 0.25 ):
+        or ( rospy.Time.now().to_sec() - self.initTime < 0.25 ):
 
             self.prevSteerAngle = self.steerAngle
             self.prevLinarSpeed = self.linearSpeed
@@ -715,7 +720,7 @@ class CarFSM:
             if self.FLAG_estop:
                 rospy.loginfo_throttle( 1 , "ESTOP ENGAGED" )
                 self.linearSpeed = 0.0
-		self.reset_time() # Reset the clock so that the car does not get stuck on resume
+                self.reset_time() # Reset the clock so that the car does not get stuck on resume
                 self.drive_pub.publish(  compose_HARE_ctrl_msg( self.steerAngle , self.linearSpeed )  )
 
             # 2. Transmit the control effort
@@ -745,9 +750,9 @@ class CarFSM:
             self.t_curr = rospy.Time.now().to_sec()
             # A. If more than 1 second has passed since the last transition, advance to the next speed state
             if self.t_curr - self.t_last > 1.0:
-                self.Tstate = ( self.Tstate + 1 ) % len( _STATETRANS )
+                self.Tstate      = ( self.Tstate + 1 ) % len( _STATETRANS ) # Warning! Quickly reversing the motor will heat up the voltage converter A LOT
                 self.linearSpeed = _STATETRANS[ self.Tstate ]
-                self.t_last = self.t_curr
+                self.t_last      = self.t_curr
 
     # === OLD PID CODE =====================================================================================================================
 
@@ -756,17 +761,17 @@ class CarFSM:
         return np.mean( self.lastScan[ :self.nearN ] )
 
     def avg_nonzero( self ):
-            """ Return the average of the nonzero elements only """
-            numNonZ = 0.0 # Number of items that are nonzero
-            totNonZ = 0.0 # Sum of items that are nonzero
-            for elem in self.lastScan:
-                if not eq_margin( elem , 0.0 ):
-                    numNonZ += 1.0
-                    totNonZ += elem
-            if totNonZ > 0:
-                return totNonZ / numNonZ
-            else:
-                return 0.0
+        """ Return the average of the nonzero elements only """
+        numNonZ = 0.0 # Number of items that are nonzero
+        totNonZ = 0.0 # Sum of items that are nonzero
+        for elem in self.lastScan:
+            if not eq_margin( elem , 0.0 ):
+                numNonZ += 1.0
+                totNonZ += elem
+        if totNonZ > 0:
+            return totNonZ / numNonZ
+        else:
+            return 0.0
 
     def wall_follow_state( self ):
         """ Try to maintain a set distance from the wall """
@@ -812,13 +817,6 @@ class CarFSM:
     # ___ END PID __________________________________________________________________________________________________________________________
 
 # __ End Class __
-
-
-# == Program Vars ==
-
-
-
-# __ End Vars __
 
 
 if __name__ == "__main__":
