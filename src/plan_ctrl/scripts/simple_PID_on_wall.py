@@ -220,7 +220,7 @@ class CarFSM:
         # 9. RC_Control vars
         # Throttle
         self.rc_throttle     =    0.0
-        self.throttle_scale  =    0.5
+        self.throttle_scale  = rospy.get_param( "RC_THROTTLE_SCALE" )
         self.rc_throttle_max = 2000
         self.rc_throttle_mid = 1500
         self.rc_throttle_min = 1000
