@@ -177,8 +177,6 @@ class CarFSM:
 
         # 3. Start subscribers and listeners
         rospy.Subscriber( "/filtered_distance" , Float32MultiArray , self.scan_cb )
-        rospy.Subscriber( "/rc_raw", RCRaw, self.rc_cb )
-        self.rc_msg = RCRaw()
         # self.FLAG_ = False
     
         # 3.5. Init scan math
@@ -234,6 +232,8 @@ class CarFSM:
         # Flags
         self.FLAG_estop   = False
         self.FLAG_rc_ovrd = False
+        rospy.Subscriber( "/rc_raw", RCRaw, self.rc_cb )
+        self.rc_msg = RCRaw()
         
 
     def scan_cb( self , msg ):
@@ -422,12 +422,12 @@ class CarFSM:
         else:
             rateTot = 0.0
             for i in xrange( self.slope_window ):
-            change     = self.err_hist[ -(i) ] - self.err_hist[ -(i+1) ]
+                change = self.err_hist[ -(i) ] - self.err_hist[ -(i+1) ]
             if self.tim_hist[ -(i) ] > 0:
                 rateChange = change / self.tim_hist[ -(i) ]
             else:
                 rateChange = 0.0
-            rateTot   += rateChange
+            rateTot += rateChange
             return rateTot / self.slope_window
     
     def clear_PID( self ):
@@ -611,7 +611,7 @@ class CarFSM:
         # NONE
     
     def STATE_collide_recover( self ):
-    """ Back up from a collision """
+        """ Back up from a collision """
     
         # ~   I. State Calcs   ~
         if not self.FLAG_backup:
