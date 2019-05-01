@@ -335,6 +335,8 @@ class CarFSM:
         self.turns_cent_setpoint = int( self.numReadings/2 ) # Center of scan with an offset, a positive addition should push the car left
         self.K_p_turn = 0.014     
         self.preturn_speed = 0.15 # Speed for 'STATE_preturn' # 0.2 is a fast jog/run
+        self.tokyo_drift = False
+        self.drift_speed = 1.0 # full speed to break free tires
         # TODO: control during preturn to 
         self.crnr_drop_dist = 0.65 # Increase in distance of the rightmost reading that will cause transition to the turn state
         # STATE_blind_right_turn
@@ -569,6 +571,7 @@ class CarFSM:
         else:
             self.state  = self.STATE_pre_turn
             self.reason = "UNDER_THRESH"
+            self.preturn_start_time = rospy.Time.now().to_sec()
         # Z. Crash Recover Override
         if self.scan_occluded():
             self.state  = self.STATE_collide_recover
@@ -590,6 +593,7 @@ class CarFSM:
             print "STATE_pre_turn" , self.reason
 
         # ~   I. State Calcs   ~
+        self.preturn_timer = rospy.Time.now().to_sec() - self.preturn_start_time
         cent_of_maxes = self.eval_scan()
         input_center  = self.eval_scan()
         rightMost     = self.lastScanNP[-1]
@@ -605,7 +609,13 @@ class CarFSM:
             self.currUp      = self.K_p_turn * translation_err
             auto_steer       = self.currUp
             self.steerAngle  = auto_steer # Control Effort
-            self.linearSpeed = self.preturn_speed 
+            if self.tokyo_drift:
+                if 0.25 < self.preturn_timer < 0.5:
+                    self.linearSpeed = self.drift_speed
+                else: 
+                    self.linearSpeed = self.preturn_speed
+            else:
+                self.linearSpeed = self.preturn_speed 
             # timing var here
 
         # IDEA: Possible deceleration phase ??
