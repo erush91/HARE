@@ -321,7 +321,7 @@ class CarFSM:
 
         # ~ State-Specific Constants ~
         # STATE_forward
-        self.straight_speed  = 0.2 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
+        self.straight_speed  = 0.3 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
         self.max_thresh_dist = 9.0 # ---------- Above this value we consider distance to be maxed out [m]
         self.thresh_count    = 5 # ------------ If there are at least this many readings above 'self.max_thresh_dist'    
         self.straights_cent_setpoint = int( self.numReadings/2 ) # + 5  # Center of scan with an offset, a positive addition should push the car left
@@ -333,7 +333,7 @@ class CarFSM:
         self.right_side_boost = 2.0
         self.preturn_angle  = 0.5 # Hard-coded turn angle for preturn
         self.turns_cent_setpoint = int( self.numReadings/2 ) # Center of scan with an offset, a positive addition should push the car left
-        self.K_p_turn = 0.014     
+        self.K_p_turn = 0.05     
         self.preturn_speed = 0.15 # Speed for 'STATE_preturn' # 0.2 is a fast jog/run
         self.tokyo_drift = False
         self.drift_speed = 1.0 # full speed to break free tires
@@ -435,8 +435,8 @@ class CarFSM:
         if len( self.err_hist ) > self.err_hist_window:
             self.err_hist.pop(0)
 
-        self.err_win_old = self.err_hist[-2:]
-        self.err_win_new = self.err_hist[-4:-2]
+        self.err_win_new = self.err_hist[-2:]
+        self.err_win_old = self.err_hist[-4:-2]
         self.err_derivative  = np.mean(self.err_win_new) - np.mean(self.err_win_old) 
         # acts as antiwindup... ignoring case when theta is at max, but thats uncommon in our scenario
         if self.FLAG_goodScan and self.state == self.STATE_forward: 
