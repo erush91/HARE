@@ -47,14 +47,20 @@ int /* --------- */ numPts; // ----- Number of points in the output array
 int /* --------- */ numLin; // ----- Number of rows to process
 std::vector<int>    scanRows; // --- Indices of matrix rows to process
 string /* ------ */ imageTopic; // - Topic that depth images will be streamed to 
+
+// Driving
 std::vector<float> distance_arr; // Array to store filtered data
-std::vector<float> sums; // ------- 
+std::vector<float> sums; // ------- buckets
+// Recovering
+std::vector<float> distance_alt; // Array to store filtered data
+std::vector<float> sums_alt; // --- buckets
+
 std::vector<float> blockLen; // --- Number of elements needed for each sampled point
 std::vector<uint>   sampleBounds; // Indiced of the buckets to sample from
 int /* --------- */ imageWidth; // - Width of the depth image
 int /* --------- */ imageHeight; //- Height of the depth image
 // ~ Defaults ~
-std::vector<int>  dfltRows /*- */ = { 310 , 260 , 210 }; // ---------- Default rows to sample
+std::vector<int>  dfltRows /*- */ = { 310 , 260 , 210 , 359 , 360 , 361 }; // ---------- Default rows to sample
 string /* ---- */ defaultCamTopic = "/camera/depth/image_rect_raw"; // Default topic for depth image
 // ___ End Vars ___
 
@@ -92,6 +98,8 @@ void image_filter_cb( const std_msgs::Float32MultiArray& msg ){
     // 0. Zero out sums
     vec_assign_all_same( sums , 0.0f );
     vec_assign_all_same( distance_arr , 0.0f );
+    vec_assign_all_same( sums_alt , 0.0f );
+    vec_assign_all_same( distance_alt , 0.0f );
     
     if( SHOWDEBUG ){
         uint dims = msg.layout.dim.size();
@@ -113,12 +121,18 @@ void image_filter_cb( const std_msgs::Float32MultiArray& msg ){
             // 4. If we have reached the bounds of the last sample, then increment sample
             if( j >= sampleBounds[ currSample ] ){  currSample++;  }
             // 5. Accumulate the distance measurement at this pixel
-            sums[ currSample ] += msg.data[ rowmajor_flat_index( imageWidth , curRow , j ) ];  
+            if( i < 3 )
+                sums[ currSample ]     += msg.data[ rowmajor_flat_index( imageWidth , curRow , j ) ];  
+            else
+                sums_alt[ currSample ] += msg.data[ rowmajor_flat_index( imageWidth , curRow , j ) ];  
         }
     }
     
     // 6. Calculate averages
-    for( int i = 0 ; i < numPts ; i++ ){  distance_arr[i] = sums[i] / blockLen[i];  }
+    for( int i = 0 ; i < numPts ; i++ ){  
+        distance_arr[i] = sums[i]     / blockLen[i];  
+        distance_alt[i] = sums_alt[i] / blockLen[i];  
+    }
 }
 
 // ___ End Functions & Classes ___
@@ -149,7 +163,7 @@ int main( int argc , char** argv ){ // Main takes the terminal command and flags
     // B. Get the number of output points
     assign_param_or_default( nodeHandle , "/numpoints" , numPts      ,  100 );
     // C. Get the number of rows to process
-    assign_param_or_default( nodeHandle , "/scanlines" , numLin      ,    3 );
+    assign_param_or_default( nodeHandle , "/scanlines" , numLin      ,    6 );
     // D. Get indices of rows to process
     assign_param_or_default( nodeHandle , "/scan_rows" , scanRows    , dfltRows );
     // E. Get the source of camera data imageTopic
@@ -166,6 +180,7 @@ int main( int argc , char** argv ){ // Main takes the terminal command and flags
 	
 	// ~ Publishers ~
 	ros::Publisher arr_pub    = nodeHandle.advertise<std_msgs::Float32MultiArray>( "/filtered_distance" , QUEUE_LEN );
+    ros::Publisher alt_pub    = nodeHandle.advertise<std_msgs::Float32MultiArray>( "/alternat_distance" , QUEUE_LEN );
 	
 	// ~ Subscribers ~
 	ros::Subscriber image_sub = nodeHandle.subscribe( imageTopic , QUEUE_LEN , image_filter_cb ); 
@@ -194,6 +209,7 @@ int main( int argc , char** argv ){ // Main takes the terminal command and flags
     	
     // B. Instantiate message
     std_msgs::Float32MultiArray flt_dist_msg;
+    std_msgs::Float32MultiArray alt_dist_msg;
         
 	/// __ END PRE-LOOP ____________________________________________________________________________________________________________________
 	
@@ -209,6 +225,10 @@ int main( int argc , char** argv ){ // Main takes the terminal command and flags
         flt_dist_msg.data.clear();
         flt_dist_msg.data = vec_copy( distance_arr );
         arr_pub.publish( flt_dist_msg );
+        
+        alt_dist_msg.data.clear();
+        alt_dist_msg.data = vec_copy( distance_alt );
+        alt_pub.publish( alt_dist_msg );
 		
 		/// __ END LOOP ____________________________________________________________________________________________________________________
 		
