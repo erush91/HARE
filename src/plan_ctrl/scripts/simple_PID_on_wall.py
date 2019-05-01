@@ -147,13 +147,6 @@ def attempt_connection( COMlist , speed ):
             print ex
     raise Warning( "attempt_connection: Unable to connect to any of " + str( COMlist ) ) # If we made it to here , we attempted all the ports
 
-def list_available_ports():
-    """ List all the ports that pyserial can detect , Results are dependent on operating system """
-    ports = list_ports.comports()
-    for port in ports:
-        print port.device , '\t' , port.manufacturer , '\t' , port.description
-    return [ port.device for port in ports  ]
-
 def send_pololu_error_clear( connection ):
     """ Spam the Maestro with error buffer requests """
     # https://www.pololu.com/docs/0J40/5.e
