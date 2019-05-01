@@ -722,13 +722,13 @@ class CarFSM:
                 self.linearSpeed = 0.0
                 self.reset_time() # Reset the clock so that the car does not get stuck on resume
                 self.drive_pub.publish(  compose_HARE_ctrl_msg( self.steerAngle , self.linearSpeed )  )
-
-            # 2. Transmit the control effort
-            if (self.FLAG_newCtrl and not self.FLAG_rc_ovrd):
-                #print( "Steering Angle:" , self.steerAngle , ", Speed:" , self.linearSpeed )
-                self.drive_pub.publish(  compose_HARE_ctrl_msg( self.steerAngle , self.linearSpeed )  )
-            elif (self.FLAG_rc_ovrd):
-                self.drive_pub.publish(  compose_HARE_ctrl_msg( self.rc_steering , self.rc_throttle )  )
+            else:
+                # 2. Transmit the control effort
+                if (self.FLAG_newCtrl and not self.FLAG_rc_ovrd):
+                    #print( "Steering Angle:" , self.steerAngle , ", Speed:" , self.linearSpeed )
+                    self.drive_pub.publish(  compose_HARE_ctrl_msg( self.steerAngle , self.linearSpeed )  )
+                elif (self.FLAG_rc_ovrd):
+                    self.drive_pub.publish(  compose_HARE_ctrl_msg( self.rc_steering , self.rc_throttle )  )
 
             # N-1: Wait until the node is supposed to fire next
             self.idle.sleep()
