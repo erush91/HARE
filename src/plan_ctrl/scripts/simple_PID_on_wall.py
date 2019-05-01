@@ -298,8 +298,8 @@ class CarFSM:
         self.slope_window    =  2 # Look this many points in the past to compute slope
         self.rhgt_rolling    = ListRoll( self.num_right_scans )    
         self.sum_err         = 0 # used for integral error   
-        self.err_win_old     = [0]*5
-        self.err_win_new     = [0]*5    
+        self.err_win_old     = [0]*2
+        self.err_win_new     = [0]*2    
         self.err_derivative  = 0 # for derivative error
 
         # ~ FSM Vars ~
@@ -321,7 +321,7 @@ class CarFSM:
 
         # ~ State-Specific Constants ~
         # STATE_forward
-        self.straight_speed  = 0.05 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
+        self.straight_speed  = 0.2 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
         self.max_thresh_dist = 9.0 # ---------- Above this value we consider distance to be maxed out [m]
         self.thresh_count    = 5 # ------------ If there are at least this many readings above 'self.max_thresh_dist'    
         self.straights_cent_setpoint = int( self.numReadings/2 ) # + 5  # Center of scan with an offset, a positive addition should push the car left
@@ -332,18 +332,19 @@ class CarFSM:
         self.preturn_max_thresh_dist = 5.0
         self.right_side_boost = 2.0
         self.preturn_angle  = 0.5 # Hard-coded turn angle for preturn
-        self.turns_cent_setpoint = int( self.numReadings/2 ) - 25 # Center of scan with an offset, a positive addition should push the car left
-        self.K_p_turn = self.K_p       
-        self.preturn_speed = 0.05 # Speed for 'STATE_preturn' # 0.2 is a fast jog/run
+        self.turns_cent_setpoint = int( self.numReadings/2 ) # Center of scan with an offset, a positive addition should push the car left
+        self.K_p_turn = 0.014     
+        self.preturn_speed = 0.15 # Speed for 'STATE_preturn' # 0.2 is a fast jog/run
         # TODO: control during preturn to 
         self.crnr_drop_dist = 0.65 # Increase in distance of the rightmost reading that will cause transition to the turn state
         # STATE_blind_right_turn
         self.turning_speed = 0.08 # Speed for 'STATE_blind_rght_turn'
         self.turning_angle = 1.5 # Turn angle for 'STATE_blind_rght_turn'
         # STATE_collide_recover
-        self.recover_speed    = -0.10 # Back up at this speed
-        self.recover_duration =  1.50 # Minimum time to recover
-        self.recover_timeout  = 10.00 # Maximum time to recover
+        self.recover_speed    = -0.15 # Back up at this speed
+        self.recover_duration =  0.10 # Minimum time to recover
+        self.recover_timeout  = 2.00 # Maximum time to recover
+        self.K_p_careful = 0.014
         # STATE_seek_open 
         self.seek_speed = 0.10 # Creep forward at this speed
 
@@ -356,7 +357,7 @@ class CarFSM:
 
         # 1.5 Grab N largest 
         self.sorted_scan_inds = self.lastScanNP.argsort() # sorted from smallest to largest
-        self.N_largest_inds = sorted_scan_inds[-self.num_largest:]
+        self.N_largest_inds = self.sorted_scan_inds[-self.num_largest:]
         # self.largest = self.lastScanNP[self.N_largest_inds]
 
         # 2. Predicate: Was the latest scan a good scan?
@@ -432,8 +433,8 @@ class CarFSM:
         if len( self.err_hist ) > self.err_hist_window:
             self.err_hist.pop(0)
 
-        self.err_win_old = self.err_hist[-5:]
-        self.err_win_new = self.err_hist[-15:-10]
+        self.err_win_old = self.err_hist[-2:]
+        self.err_win_new = self.err_hist[-4:-2]
         self.err_derivative  = np.mean(self.err_win_new) - np.mean(self.err_win_old) 
         # acts as antiwindup... ignoring case when theta is at max, but thats uncommon in our scenario
         if self.FLAG_goodScan and self.state == self.STATE_forward: 
@@ -459,17 +460,13 @@ class CarFSM:
         else:
             rateTot = 0.0
             for i in xrange( self.slope_window ):
-<<<<<<< HEAD
                 change = self.err_hist[ -(i) ] - self.err_hist[ -(i+1) ]
-            if self.tim_hist[ -(i) ] > 0:
-                rateChange = change / self.tim_hist[ -(i) ]
-            else:
-                rateChange = 0.0
-            rateTot += rateChange
+                if self.tim_hist[ -(i) ] > 0:
+                    rateChange = change / self.tim_hist[ -(i) ]
+                else:
+                    rateChange = 0.0
+                rateTot += rateChange
             return rateTot / self.slope_window
-    
-    
-=======
                 
         
     def clear_PID( self ):
@@ -480,7 +477,7 @@ class CarFSM:
         self.err_derivative  = 0
         # self.rhgt_rolling.zero_out()
         
-    def steer_center( self , reverse = 0 ):
+    def steer_center( self , P_gain, reverse = 0 ):
         """ PID Controller on the max value of the scan , Return steering command """
         filtScan = avg_filter( self.lastScanNP ) # does some level of filtering on the scan
         centrDex = max_dex( filtScan )
@@ -490,7 +487,7 @@ class CarFSM:
             factor =  1.0
         # Calc a new effort 
         translation_err  = self.update_err( centrDex , self.cent_setpoint )
-        self.currUp      = self.K_p * translation_err
+        self.currUp      = P_gain * translation_err
         self.currUi      = self.K_i * self.integrate_err()
         self.currUd      = self.K_d * self.rate_err() # This should be a
         auto_steer       = self.currUp + self.currUi + self.currUd # NOTE: P-ctrl only for demo
@@ -515,6 +512,7 @@ class CarFSM:
 
         # ~   I. State Calcs   ~
         self.eval_scan() # Assess straight-line driving
+        self.reset_time()
 
         # ~  II. Set controls  ~
         self.steerAngle  = 0.0
@@ -608,6 +606,7 @@ class CarFSM:
             auto_steer       = self.currUp
             self.steerAngle  = auto_steer # Control Effort
             self.linearSpeed = self.preturn_speed 
+            # timing var here
 
         # IDEA: Possible deceleration phase ??
 
@@ -677,7 +676,7 @@ class CarFSM:
         # ~  II. Set controls  ~
         self.linearSpeed = self.recover_speed
         # self.steerAngle  = 0.00
-        self.steerAngle  = self.steer_center( reverse = 1 )
+        self.steerAngle  = self.steer_center(self.K_p_careful, reverse = 1 )
         
         # ~ III. Transition Determination ~
         # A. If the min time has not passed, continue to recover
@@ -720,7 +719,7 @@ class CarFSM:
         self.eval_scan()
         # ~  II. Set controls  ~
         self.linearSpeed = self.seek_speed
-        self.steerAngle  = self.steer_center()    
+        self.steerAngle  = self.steer_center(self.K_p)    
         # ~ III. Transition Determination ~
         # a. If there is an open hallway, GO
         if self.FLAG_goodScan:
@@ -765,9 +764,11 @@ class CarFSM:
         while ( not rospy.is_shutdown() ):
 
             # 1. Calculate a control effort
+            #self.FLAG_newCtrl = True # HACKKKKKKKKKKKKKKKKKKKKKKKKKK
             if 1: # Enable Finite State Machine
                 self.hallway_FSM()
                 self.dampen_micro_cmds()
+                
             else: # Enable test - Unchanging open loop command
                 self.test_state()
 
@@ -799,7 +800,7 @@ class CarFSM:
         self.steerAngle = pi/4 * sin( self.t_curr )
         # 2. Set the throttle
         if 1:
-            self.linearSpeed = 0.0
+            self.linearSpeed = 0.1
         else:
             self.t_curr = rospy.Time.now().to_sec()
             # A. If more than 1 second has passed since the last transition, advance to the next speed state

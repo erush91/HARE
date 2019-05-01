@@ -13,6 +13,8 @@ build/
 *.pyc
 *.gch
 *.cbp
+*.bag 
+*.active
 *CMakeFiles*
 *catkin_generated*
 *Makefile
