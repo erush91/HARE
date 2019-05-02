@@ -116,6 +116,7 @@ int main(int argc, char * argv[]) try
     cv_image_color.encoding = "bgr8";
     // Image Msg
     sensor_msgs::Image ros_image_color;
+    bool INDIRECT = false; // Why 'mat_color' as an intermediary? 'cv_image_color.image' is already 'cv::Mat'
     
     while (nh_.ok() && waitKey(1) < 0) 
     {
@@ -142,15 +143,19 @@ int main(int argc, char * argv[]) try
         {
             rs2::frame frame_color = frame_set.get_color_frame();
 
-            //////////////////////////////////////////////
-            // SEND FRAME DATA TO 8-BIT OPENCV MATRICES //
-            //////////////////////////////////////////////
-            mat_color = cv::Mat( Size( COLOR_WIDTH , COLOR_HEIGHT ) , CV_8UC3 , (void*)frame_color.get_data() , Mat::AUTO_STEP );
+            if( INDIRECT ){
+                //////////////////////////////////////////////
+                // SEND FRAME DATA TO 8-BIT OPENCV MATRICES //
+                //////////////////////////////////////////////
+                mat_color = cv::Mat( Size( COLOR_WIDTH , COLOR_HEIGHT ) , CV_8UC3 , (void*)frame_color.get_data() , Mat::AUTO_STEP );
 
-            //////////////////////////////////////////
-            // CONVERT CV:MAT to SENSOR_MSGS::IMAGE //
-            //////////////////////////////////////////
-            cv_image_color.image = mat_color; // ----------- Save the frame from the realsense
+                //////////////////////////////////////////
+                // CONVERT CV:MAT to SENSOR_MSGS::IMAGE //
+                //////////////////////////////////////////
+                cv_image_color.image = mat_color; // ----------- Save the frame from the realsense
+            }else{
+                cv_image_color.image = cv::Mat( Size( COLOR_WIDTH , COLOR_HEIGHT ) , CV_8UC3 , (void*)frame_color.get_data() , Mat::AUTO_STEP ); // Save the frame from the realsense
+            }
             cv_image_color.toImageMsg( ros_image_color ); // Convert to the ROS format and load into 'ros_image_color'
             
 
