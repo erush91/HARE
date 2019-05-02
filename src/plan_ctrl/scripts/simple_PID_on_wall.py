@@ -46,9 +46,6 @@ from std_msgs.msg import Float32MultiArray
 from geometry_msgs.msg import PoseStamped, Point, Twist
 from ros_pololu_servo.msg import MotorCommand
 from ros_pololu_servo.msg import HARECommand
-import serial # pySerial for USB comms w/ Pololu
-from serial.tools import list_ports
-import struct # for data composition over serial
 
 # ~ Custom Messages ~
 from plan_ctrl.msg import CarState
@@ -132,54 +129,7 @@ def avg_filter( inLst , width = 3 ):
 def max_dex( numLst ):
     """ Return the maximum index , First incidence """
     # NOTE: This function assumes that 'numLst' has only numeric elements
-    return numLst.index( max( numLst ) )
-
-def attempt_connection( COMlist , speed ):
-    """ Attempt to connect to each of 'COMlist' until one succeeds """
-    ser = None
-    for port in COMlist:
-        try:
-            ser = serial.Serial( port , speed ) # This must match the port selected in the Arduino IDE
-            print "Connected to port:" , ser.name 
-            return ser
-        except Exception as ex:
-            print "ERROR: COULD NOT ESTABLISH SERIAL CONNECTION WITH" , port , ", Check that the port is correct ..."
-            print ex
-    raise Warning( "attempt_connection: Unable to connect to any of " + str( COMlist ) ) # If we made it to here , we attempted all the ports
-
-def send_pololu_error_clear( connection ):
-    """ Spam the Maestro with error buffer requests """
-    # https://www.pololu.com/docs/0J40/5.e
-    # Compact Protocol: This is the simpler and more compact of the two protocols; 
-    #                   it is the protocol you should use if your Maestro is the only device connected to your serial line.
-    compact = [ 162 ] # ----------- Compact protocol: 0xA2 # int('a2',16) = 162
-    polProt = [ 170 ,   0 ,  34 ] # Pololu protocol: 0xAA, device number, 0x22    
-    msg     = bytearray( compact )
-    repeat  = 5
-    for i in xrange( repeat ):
-        connection.write( msg )
-        rospy.sleep( 0.001 )
-    print "Spammed serial connection with byte message" , msg , "," , repeat , "times!"
-        
-def clear_pololu_err_buf():
-    """ Connect w/ Maestro, Spam error clear, Close connection """
-    COMLIST = [ '/dev/pololu' ]
-    COMBAUD = 115200
-    pol_ser = attempt_connection( COMLIST , COMBAUD )
-    if pol_ser:
-        print "Connection open!"
-    try:
-        send_pololu_error_clear( pol_ser )
-        if pol_ser.in_waiting:
-            readResult = pol_ser.read( pol_ser.in_waiting )
-            print "Error Bytes:" , readResult                 
-        else:
-            print "There were no error bytes to read ..."
-        pol_ser.close()
-        print "Connection closed!"
-    except Exception as ex:
-        print "Pololu error clear operation failed for the following reason:"
-        print ex                
+    return numLst.index( max( numLst ) )            
 
 # __ End Func __
 
@@ -228,9 +178,11 @@ class CarFSM:
 
         # 3. Start subscribers and listeners
         rospy.Subscriber( "/filtered_distance" , Float32MultiArray , self.scan_cb )
+        rospy.Subscriber( "/alternat_distance" , Float32MultiArray , self.ocld_cb )
         # self.FLAG_ = False
 
         # 3.5. Init scan math
+        # 3.5.1. Driving Scan 
         self.numReadings     = 100
         self.num_right_scans =   5
         self.old_right_mean  =   0.0 # np.ones((self.num_right_scans))*20
@@ -238,6 +190,9 @@ class CarFSM:
         self.scanCenter      = int( self.numReadings//2 ) # + 5 # Cetner of scan with an offset
         self.lastScan        = [ 0.0 for i in range( self.numReadings ) ]
         self.lastScanNP      = np.asarray( self.lastScan )
+        # 3.5.2. Collision Scan
+        self.ocldScan        = [ 0.0 for i in range( self.numReadings ) ]
+        self.ocldScanNP      = np.asarray( self.ocldScan )        
 
         # 4. Start publishers
         try:
@@ -285,9 +240,6 @@ class CarFSM:
         self.FLAG_rc_ovrd = False
         rospy.Subscriber( "/rc_raw", RCRaw, self.rc_cb )
         self.rc_msg = RCRaw()
-        
-        # 10. Attempt to clear error buffer
-#         clear_pololu_err_buf()
 
     def scan_cb( self , msg ):
         """ Process the scan that comes back from the scanner """
@@ -296,6 +248,12 @@ class CarFSM:
             self.lastScan = [ elem/25.50 for elem in msg.data ] # scale [0,255] to [0,10]
         else:
             self.lastScan = msg.data
+            
+    def ocld_cb( self , msg ):
+        """ Receive the tight scan, And convert to np array """
+        # NOTE: Last three rows of the scan config should be set to whatever avoids obstacles the best
+        self.ocldScan   = msg.data
+        self.ocldScanNP = np.asarray( self.ocldScan )   
 
     def rc_cb( self , msg ):
         self.rc_msg = msg
@@ -415,7 +373,6 @@ class CarFSM:
         # 1.5 Grab N largest 
         self.sorted_scan_inds = self.lastScanNP.argsort() # sorted from smallest to largest
         self.N_largest_inds = self.sorted_scan_inds[-self.num_largest:]
-        # self.largest = self.lastScanNP[self.N_largest_inds]
 
         # 2. Predicate: Was the latest scan a good scan?
         if len( self.above_thresh ) >= self.thresh_count:
@@ -426,7 +383,6 @@ class CarFSM:
             self.above_thresh = np.where( self.lastScanNP > self.preturn_max_thresh_dist )[0]
             self.sorted_scan_inds = self.lastScanNP.argsort() # sorted from smallest to largest
             self.N_largest_inds = self.sorted_scan_inds[-self.num_largest:]
-            # self.largest = self.lastScanNP[self.N_largest_inds]
             if len( self.above_thresh ) >=self.thresh_count:
                 pass
             else: print('didnt expect this, could be a problem')
@@ -447,7 +403,7 @@ class CarFSM:
         # NOTE: This function assumes that eval_scan has already been run
         SHOWDEBUG = 0
         # 1. Determine which scan values are above the threshold
-        self.occlude_indices = np.where( self.lastScanNP <= self.occlude_dist )[0]
+        self.occlude_indices = np.where( self.ocldScanNP <= self.occlude_dist )[0]
         # 2. Predicate: Was the latest scan a good scan?
         if len( self.occlude_indices ) >= self.occlude_limit:
             return True
@@ -534,10 +490,16 @@ class CarFSM:
         self.err_derivative  = 0
         # self.rhgt_rolling.zero_out()
         
-    def steer_center( self , P_gain, reverse = 0 ):
+    def steer_center( self , P_gain , reverse = 0 , useAlt = True ):
         """ PID Controller on the max value of the scan , Return steering command """
-        filtScan = avg_filter( self.lastScanNP ) # does some level of filtering on the scan
+        useID = False
+        # 1. Use the alternate (tight/occlusion) scan unless the user specifies
+        if useAlt:
+            filtScan = avg_filter( self.ocldScanNP ) # does some level of filtering on the scan
+        else:
+            filtScan = avg_filter( self.lastScanNP ) # does some level of filtering on the scan
         centrDex = max_dex( filtScan )
+        # 2. Reverse if the user specifies
         if reverse:
             factor = -1.0
         else:
@@ -545,8 +507,12 @@ class CarFSM:
         # Calc a new effort 
         translation_err  = self.update_err( centrDex , self.cent_setpoint )
         self.currUp      = P_gain * translation_err
-        self.currUi      = self.K_i * self.integrate_err()
-        self.currUd      = self.K_d * self.rate_err() # This should be a
+        if useID:
+            self.currUi      = self.K_i * self.integrate_err()
+            self.currUd      = self.K_d * self.rate_err() # This should be a
+        else:
+            self.currUi = 0.0
+            self.currUd = 0.0
         auto_steer       = self.currUp + self.currUi + self.currUd # NOTE: P-ctrl only for demo
         # Return the total PID steer effort, reversing if 
         return auto_steer * factor
@@ -850,6 +816,7 @@ class CarFSM:
                     self.drive_pub.publish(  compose_HARE_ctrl_msg( self.steerAngle , self.linearSpeed )  )
                 elif (self.FLAG_rc_ovrd):
                     self.drive_pub.publish(  compose_HARE_ctrl_msg( self.rc_steering , self.rc_throttle )  )
+                    self.reset_time() # Reset the clock so that the car does not get stuck on resume
 
             # N-1: Wait until the node is supposed to fire next
             self.idle.sleep()
