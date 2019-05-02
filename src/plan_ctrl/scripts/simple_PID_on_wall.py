@@ -208,13 +208,20 @@ class CarFSM:
         self.initTime = rospy.Time.now().to_sec() # Time that the node was started
         self.lastTime = self.initTime # ----------- Time that the last loop began
 
-        # ~ PID ~
-        self.K_d = rospy.get_param( "D_VALUE" )
-        self.K_i = rospy.get_param( "I_VALUE" )
-        self.K_p = rospy.get_param( "P_VALUE" )
-
-        # 7. FSM Vars
-        self.set_FSM_vars()
+        # ~~ PID ~~
+        self.K_d    = rospy.get_param( "D_VALUE" )
+        self.K_i    = rospy.get_param( "I_VALUE" )
+        self.K_p    = rospy.get_param( "P_VALUE" )
+        self.currUp = 0.0
+        self.currUi = 0.0
+        self.currUd = 0.0
+        # ~ Control Output ~
+        self.FLAG_newCtrl   = False # Flag for whether we accept the new control signal
+        self.steerAngle     = 0.0
+        self.prevSteerAngle = 0.0
+        self.prevLinarSpeed = 0.0
+        self.angleDiffMin   = rospy.get_param( "ANGLE_DIFF_MIN" ) # limits micro commands
+        self.linearSpeed    = rospy.get_param( "LINEAR_SPEED"   ) # [ -1 ,  1 ]    
 
         # 8. Test vars
         self.t_test = 0.0
@@ -240,6 +247,10 @@ class CarFSM:
         self.FLAG_rc_ovrd = False
         rospy.Subscriber( "/rc_raw", RCRaw, self.rc_cb )
         self.rc_msg = RCRaw()
+
+        # 7. FSM Vars
+        self.set_FSM_vars()
+        
 
     def scan_cb( self , msg ):
         """ Process the scan that comes back from the scanner """
@@ -292,14 +303,6 @@ class CarFSM:
     def set_FSM_vars( self ):
         """ Set the variables necessary for the FSM controller """
 
-        # ~ Control Output ~
-        self.FLAG_newCtrl   = False # Flag for whether we accept the new control signal
-        self.steerAngle     = 0.0
-        self.prevSteerAngle = 0.0
-        self.prevLinarSpeed = 0.0
-        self.angleDiffMin   = rospy.get_param( "ANGLE_DIFF_MIN" ) # limits micro commands
-        self.linearSpeed    = rospy.get_param( "LINEAR_SPEED"   ) # [ -1 ,  1 ]    
-        
         # ~ Driving Vars ~
         self.err_hist_window = 25 # Width of the integration window
         self.err_hist        = [0]*self.err_hist_window 
@@ -322,46 +325,64 @@ class CarFSM:
         self.occlude_limit   = 33 # ------------ Minimum number of occluded scan readings that indicate view occlusion
         self.occlude_indices = [] # ------------ Currently occluded indices
         self.FLAG_backup     = False # --------- Flag set at the beginning of the recovery phase
-        self.rcovr_bgn_time  = 0.0
-        self.num_largest = 15 # fix number of largest vals to search for 
+        self.rcovr_bgn_time  = 0.0 # ----------- 
+        self.num_largest     = 15 # ------------ Fix number of largest vals to search for 
 
-        # ~ PID Vars ~
-        self.currUp = 0.0
-        self.currUi = 0.0
-        self.currUd = 0.0
-
-        # ~ State-Specific Constants ~
-        # STATE_forward
-        self.straight_speed  = 0.32 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
+        # ~~ State-Specific Constants ~~
+        # ~ STATE_forward ~
+        self.straight_speed  = 0.22 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
         self.max_thresh_dist = 9.0 # ---------- Above this value we consider distance to be maxed out [m]
         self.thresh_count    = 5 # ------------ If there are at least this many readings above 'self.max_thresh_dist'    
         self.straights_cent_setpoint = int( self.numReadings/2 ) # + 5  # Center of scan with an offset, a positive addition should push the car left
         self.K_p_straight = self.K_p        
         self.K_d_straight = self.K_d 
         self.K_i_straight = self.K_i
-        # STATE_preturn
+        # ~ STATE_preturn ~
         self.preturn_max_thresh_dist = 5.0
         self.right_side_boost = 2.0
         self.preturn_angle  = 0.5 # Hard-coded turn angle for preturn
         self.turns_cent_setpoint = int( self.numReadings/2 ) # Center of scan with an offset, a positive addition should push the car left
         self.K_p_turn = 0.07     
-        self.preturn_speed = 0.25 # Speed for 'STATE_preturn' # 0.2 is a fast jog/run
+        self.preturn_speed = 0.15 # Speed for 'STATE_preturn' # 0.2 is a fast jog/run        
         self.tokyo_drift = False
+        # Drifting Vars
         self.drift_speed = 0.0 # full speed to break free tires
         self.preturn_start = 0.75
         self.preturn_stop = 0.85
         # TODO: control during preturn to 
         self.crnr_drop_dist = 0.65 # Increase in distance of the rightmost reading that will cause transition to the turn state
-        # STATE_blind_right_turn
+        # ~ STATE_blind_right_turn ~
         self.turning_speed = 0.08 # Speed for 'STATE_blind_rght_turn'
         self.turning_angle = 1.5 # Turn angle for 'STATE_blind_rght_turn'
-        # STATE_collide_recover
+        # ~ STATE_collide_recover ~
         self.recover_speed    = -0.15 # Back up at this speed
         self.recover_duration =  0.10 # Minimum time to recover
         self.recover_timeout  = 2.00 # Maximum time to recover
         self.K_p_careful = 0.014
-        # STATE_seek_open 
+        # ~ STATE_seek_open ~
         self.seek_speed = 0.10 # Creep forward at this speed
+
+        _CAREFUL_SETTINGS = 0 # NOTE: SET TO 1 FOR { A. BOX RUN , B. STOP SIGN CHALLENGE? }
+
+        # TODO: FREEZE SETTINGS FOR CALM DRIVING
+        if _CAREFUL_SETTINGS:
+            # ~~ State-Specific Constants ~~
+            # ~ STATE_forward ~
+            self.straight_speed  = 0.32 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
+            self.max_thresh_dist = 9.0 # ---------- Above this value we consider distance to be maxed out [m]
+            self.thresh_count    = 5 # ------------ If there are at least this many readings above 'self.max_thresh_dist'    
+            self.straights_cent_setpoint = int( self.numReadings/2 ) # + 5  # Center of scan with an offset, a positive addition should push the car left
+            self.K_p_straight = self.K_p        
+            self.K_d_straight = self.K_d 
+            self.K_i_straight = self.K_i
+            # ~ STATE_preturn ~
+            self.preturn_max_thresh_dist = 5.0
+            self.right_side_boost = 2.0
+            self.preturn_angle  = 0.5 # Hard-coded turn angle for preturn
+            self.turns_cent_setpoint = int( self.numReadings/2 ) # Center of scan with an offset, a positive addition should push the car left
+            self.K_p_turn = 0.07     
+            self.preturn_speed = 0.25 # Speed for 'STATE_preturn' # 0.2 is a fast jog/run        
+            self.tokyo_drift = False
 
     def eval_scan( self ):
         """ Populate the threshold array and return its center """
