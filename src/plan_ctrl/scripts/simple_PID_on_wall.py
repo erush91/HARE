@@ -323,7 +323,7 @@ class CarFSM:
         self.seq             =  0 # ------------ Sequence number to give ROS
         self.FLAG_goodScan   = False # --------- Was the last scan appropriate for straight-line driving
         self.reason          = "INIT" # -------- Y U change state?
-        self.occlude_dist    =  0.25 # --------- Maximum distance for which a scan reading is considered occluded
+        self.occlude_dist    =  1.0  # --------- Maximum distance for which a scan reading is considered occluded
         self.occlude_limit   = 33 # ------------ Minimum number of occluded scan readings that indicate view occlusion
         self.occlude_indices = [] # ------------ Currently occluded indices
         self.FLAG_backup     = False # --------- Flag set at the beginning of the recovery phase
@@ -333,9 +333,9 @@ class CarFSM:
         # ~~ State-Specific Constants ~~
         # ~ STATE_forward ~
         self.straight_speed  = 0.3 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
-        self.max_thresh_dist = 9.0 # ---------- Above this value we consider distance to be maxed out [m]  # TODO: Try 8 for tighter turns
+        self.max_thresh_dist = 8.5 # ---------- Above this value we consider distance to be maxed out [m]  # TODO: Try 8 for tighter turns
         self.thresh_count    = 5 # ------------ If there are at least this many readings above 'self.max_thresh_dist'    
-        self.straights_cent_setpoint = int( self.numReadings/2 ) # + 5  # Center of scan with an offset, a positive addition should push the car left
+        self.straights_cent_setpoint = int( self.numReadings/2 )  + 1.0  # Center of scan with an offset, a positive addition should push the car left
         self.K_p_straight = self.K_p        
         self.K_d_straight = self.K_d 
         self.K_i_straight = self.K_i
@@ -343,8 +343,8 @@ class CarFSM:
         self.preturn_max_thresh_dist = 5.0
         self.right_side_boost = 2.0
         self.turns_cent_setpoint = int( self.numReadings/2 ) # Center of scan with an offset, a positive addition should push the car left
-        self.K_p_turn = 0.05     
-        self.preturn_speed = 0.15 # Speed for 'STATE_preturn' # 0.2 is a fast jog/run        
+        self.K_p_turn = 0.08
+        self.preturn_speed = 0.2 # Speed for 'STATE_preturn' # 0.2 is a fast jog/run        
         self.tokyo_drift = False
         # Drifting Vars
         self.drift_speed = 0.0 # full speed to break free tires
@@ -358,15 +358,15 @@ class CarFSM:
         self.counter_steer_duration = 0.200
         # ~ STATE_collide_recover ~
         self.recover_speed    = -0.15 # Back up at this speed
-        self.recover_duration =  0.10 # Minimum time to recover
+        self.recover_duration =  0.20 # Minimum time to recover
         self.recover_timeout  = 2.00 # Maximum time to recover
-        self.K_p_backup = 0.04
+        self.K_p_backup = 0.02
 
         # ~ STATE_seek_open ~
         self.seek_speed = 0.10 # Creep forward at this speed
-        self.K_p_creep = 0.05
+        self.K_p_creep = 0.3
 
-        self._CAREFUL_SETTINGS = 0 # NOTE: SET TO 1 FOR { A. BOX RUN , B. STOP SIGN CHALLENGE? }
+        self._CAREFUL_SETTINGS = 1 # NOTE: SET TO 1 FOR { A. BOX RUN , B. STOP SIGN CHALLENGE? }
 
         # FROZEN SETTINGS FOR CALM DRIVING
         if self._CAREFUL_SETTINGS:
@@ -430,12 +430,12 @@ class CarFSM:
         # return np.mean( self.above_thresh )
         return np.mean( self.N_largest_inds )
 
-    def scan_occluded( self ):
+    def scan_occluded( self, offset = 0 ):
         """ Return True if the last scan has more than the designated number of very-near readings """
         # NOTE: This function assumes that eval_scan has already been run
         SHOWDEBUG = 0
         # 1. Determine which scan values are above the threshold
-        self.occlude_indices = np.where( self.ocldScanNP <= self.occlude_dist )[0]
+        self.occlude_indices = np.where( self.ocldScanNP <= self.occlude_dist + offset )[0]
         # 2. Predicate: Was the latest scan a good scan?
         if 1:
             if len( self.occlude_indices ) >= self.occlude_limit:
@@ -727,7 +727,7 @@ class CarFSM:
         # B. Else the minimum time has passed
         else:
             # i. If the occlusion has been cleared, then seek open space
-            if not self.scan_occluded():
+            if not self.scan_occluded(0.5):
                 self.FLAG_backup = False
                 self.eval_scan()
                 # a. If there is an open hallway, GO
@@ -819,6 +819,7 @@ class CarFSM:
                 rospy.loginfo_throttle( 1 , "ESTOP ENGAGED" )
                 self.linearSpeed = 0.0
                 self.reset_time() # Reset the clock so that the car does not get stuck on resume
+                self.clear_PID()
                 self.drive_pub.publish(  compose_HARE_ctrl_msg( self.steerAngle , self.linearSpeed )  )
             else: # only transmit control effort if not Estopped
                 # 2. Transmit the control effort

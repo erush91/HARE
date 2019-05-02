@@ -25,9 +25,9 @@
     <param name="ANGLE_DIFF_MIN" type="double" value="0.196"/> <!-- pi/16 = 0.196 -->
     
     <!-- param name="P_VALUE" type="double" value="1.0000"/ --> <!-- 'wall_follow_state' controls on "meters" -->
-    <param name="P_VALUE" type="double" value="0.030"/> <!-- 'hallway_FSM' controls on "indices" -->
-    <param name="I_VALUE" type="double" value="0.00001"/>
-    <param name="D_VALUE" type="double" value="0.024"/> 
+    <param name="P_VALUE" type="double" value="0.035"/> <!-- 'hallway_FSM' controls on "indices" -->
+    <param name="I_VALUE" type="double" value="0.00007"/>
+    <param name="D_VALUE" type="double" value="0.032"/> 
 
     <!-- This should range from 0 - 1 -->
     <param name="RC_THROTTLE_SCALE" type="double" value="0.5"/> 
