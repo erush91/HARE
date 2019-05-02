@@ -60,7 +60,7 @@ std::vector<uint>   sampleBounds; // Indiced of the buckets to sample from
 int /* --------- */ imageWidth; // - Width of the depth image
 int /* --------- */ imageHeight; //- Height of the depth image
 // ~ Defaults ~
-std::vector<int>  dfltRows /*- */ = { 310 , 260 , 210 , 359 , 360 , 361 }; // ---------- Default rows to sample
+std::vector<int>  dfltRows /*- */ = { 100 , 125 , 150 , 179 , 180 , 181 }; // ---------- Default rows to sample
 string /* ---- */ defaultCamTopic = "/camera/depth/image_rect_raw"; // Default topic for depth image
 // ___ End Vars ___
 
@@ -121,10 +121,11 @@ void image_filter_cb( const std_msgs::Float32MultiArray& msg ){
             // 4. If we have reached the bounds of the last sample, then increment sample
             if( j >= sampleBounds[ currSample ] ){  currSample++;  }
             // 5. Accumulate the distance measurement at this pixel
-            if( i < 3 )
+            if( i < 3 ){
                 sums[ currSample ]     += msg.data[ rowmajor_flat_index( imageWidth , curRow , j ) ];  
-            else
+            }else{
                 sums_alt[ currSample ] += msg.data[ rowmajor_flat_index( imageWidth , curRow , j ) ];  
+            }
         }
     }
     
@@ -145,11 +146,7 @@ void image_filter_cb( const std_msgs::Float32MultiArray& msg ){
 int main( int argc , char** argv ){ // Main takes the terminal command and flags that called it as arguments
 	srand( time( 0 ) ); // Random seed based on the current clock time
 	
-	/// === Preliminary { Setup , Instantiation , Planning  } ==============================================================================
-
-    // NONE?
-
-	/// ___ End Preliminary ________________________________________________________________________________________________________________
+	bool SHOWDEBUG = true; // if( SHOWDEBUG ){ cerr << "" << endl; }
 	
 	// 0. Init ROS  &&  Register node
 	ros::init( argc , argv , NODE_NAME );
@@ -157,6 +154,8 @@ int main( int argc , char** argv ){ // Main takes the terminal command and flags
 	// 1. Fetch handle to this node
 	ros::NodeHandle nodeHandle;
     
+    if( SHOWDEBUG ){ cerr << "About to load params ..."; }
+
     // 1.5. Fetch params
     // A. Get the refresh rate
     assign_param_or_default( nodeHandle , "/publ_rate" , RATE_HZ     ,  100 );
@@ -169,18 +168,22 @@ int main( int argc , char** argv ){ // Main takes the terminal command and flags
     // E. Get the source of camera data imageTopic
     assign_param_or_default( nodeHandle , "/imagtopic" , imageTopic  , defaultCamTopic );
     // F. Get the image width
-    assign_param_or_default( nodeHandle , "/imagewdth" , imageWidth  , 1280 );
+    assign_param_or_default( nodeHandle , "/imagewdth" , imageWidth  , 640 );
     // G. Get the image height
-    assign_param_or_default( nodeHandle , "/imagehght" , imageHeight ,  720 );
+    assign_param_or_default( nodeHandle , "/imagehght" , imageHeight ,  360 );
     
+    if( SHOWDEBUG ){ cerr << " Loaded!" << endl; }
+
 	// 2. Init node rate
 	ros::Rate heartbeat( RATE_HZ );
 	
 	// 3. Set up subscribers and publishers
-	
+    if( SHOWDEBUG ){ cerr << "About to start publishers ..."; }
 	// ~ Publishers ~
 	ros::Publisher arr_pub    = nodeHandle.advertise<std_msgs::Float32MultiArray>( "/filtered_distance" , QUEUE_LEN );
     ros::Publisher alt_pub    = nodeHandle.advertise<std_msgs::Float32MultiArray>( "/alternat_distance" , QUEUE_LEN );
+
+    if( SHOWDEBUG ){ cerr << " Publishing!" << endl; }
 	
 	// ~ Subscribers ~
 	ros::Subscriber image_sub = nodeHandle.subscribe( imageTopic , QUEUE_LEN , image_filter_cb ); 
@@ -200,9 +203,13 @@ int main( int argc , char** argv ){ // Main takes the terminal command and flags
 	/// == PRE-LOOP WORK ===================================================================================================================
 		
     // A. Set up the output array(s)
+    // Preallocate arrs
     distance_arr = vec_float_zeros( numPts ); // Pre-allocate an array
     sums         = vec_float_zeros( numPts ); // Pre-allocate an array
+    distance_alt = vec_float_zeros( numPts ); // Pre-allocate an array
+    sums_alt     = vec_float_zeros( numPts ); // Pre-allocate an array
     blockLen     = vec_float_zeros( numPts ); // Pre-allocate an array
+    
     sampleBounds = even_index_bounds( imageWidth , numPts );
     std::vector<uint> widths = elem_count_bounds( sampleBounds );
     for( uint i = 0 ; i < numPts ; i++ ){  blockLen[i] = widths[i] * 1.0 * numLin;  }

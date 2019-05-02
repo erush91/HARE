@@ -426,10 +426,13 @@ class CarFSM:
         # 1. Determine which scan values are above the threshold
         self.occlude_indices = np.where( self.ocldScanNP <= self.occlude_dist )[0]
         # 2. Predicate: Was the latest scan a good scan?
-        if len( self.occlude_indices ) >= self.occlude_limit:
-            return True
+        if 1:
+            if len( self.occlude_indices ) >= self.occlude_limit:
+                return True
+            else:
+                return False    
         else:
-            return False    
+            return False
 
     def report_state( self ):
         """ Accumulate and publish controller state """
