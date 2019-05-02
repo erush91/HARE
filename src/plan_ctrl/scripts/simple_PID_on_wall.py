@@ -207,6 +207,7 @@ class CarFSM:
         # 5. Init vars
         self.initTime = rospy.Time.now().to_sec() # Time that the node was started
         self.lastTime = self.initTime # ----------- Time that the last loop began
+        self.prntTime = self.initTime
 
         # ~~ PID ~~
         self.K_d    = rospy.get_param( "D_VALUE" )
@@ -318,6 +319,7 @@ class CarFSM:
 
         # ~ FSM Vars ~
         self.state           = self.STATE_init # Currently-active state, the actual function
+        self.prevState       = self.STATE_init # Previous state, the actual function
         self.seq             =  0 # ------------ Sequence number to give ROS
         self.FLAG_goodScan   = False # --------- Was the last scan appropriate for straight-line driving
         self.reason          = "INIT" # -------- Y U change state?
@@ -795,8 +797,11 @@ class CarFSM:
         """ Execute state actions and record current status """
         # NOTE: Each state must handle its own data collection, processing, control setting, and transition
         self.state() # ------ State actions and transition
-        print self.state.__name__ , ',' , self.reason , ',' , self.steerAngle , ',' , self.linearSpeed
         self.report_state() # Publish state info
+        if self.state != self.prevState or ((rospy.Time.now().to_sec() - self.prntTime) > 0.5): # only print on transtion
+            print self.state.__name__ , ',' , self.reason , ',' , self.steerAngle , ',' , self.linearSpeed
+            self.prntTime = rospy.Time.now().to_sec()
+        self.prevState = self.state # Update previous
 
     # ___ END FSM __________________________________________________________________________________________________________________________
 
