@@ -109,9 +109,9 @@ int main(int argc, char * argv[]) try
     // Configured left infrared stream
     // https://github.com/IntelRealSense/librealsense/issues/1140
     if (INFRARED_FLAG)
-    {
-        cfg.enable_stream(RS2_STREAM_INFRARED, 1, INFRARED_WIDTH, INFRARED_HEIGHT, RS2_FORMAT_Y8, INFRARED_FPS);
-        cfg.enable_stream(RS2_STREAM_INFRARED, 2, INFRARED_WIDTH, INFRARED_HEIGHT, RS2_FORMAT_Y8, COLOR_FPS);
+    {   // https://github.com/IntelRealSense/librealsense/issues/1140#issuecomment-364737911
+        cfg.enable_stream(RS2_STREAM_INFRARED, 1, INFRARED_WIDTH, INFRARED_HEIGHT, RS2_FORMAT_Y8, INFRARED_FPS); // left
+        cfg.enable_stream(RS2_STREAM_INFRARED, 2, INFRARED_WIDTH, INFRARED_HEIGHT, RS2_FORMAT_Y8, INFRARED_FPS); // right
     }
     
     // Instruct pipeline to start streaming with the requested configuration

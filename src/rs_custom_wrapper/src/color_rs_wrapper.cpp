@@ -108,8 +108,14 @@ int main(int argc, char * argv[]) try
     // Setup color publisher
     ros::Publisher pub_image_color = nh_.advertise<sensor_msgs::Image>("/camera/color/image_rect_raw", 1);
 
-
-    cv::Mat mat_color(Size(COLOR_WIDTH, COLOR_HEIGHT), CV_32FC1);
+    cv::Mat mat_color( Size( COLOR_WIDTH , COLOR_HEIGHT ) , CV_8UC3 ); 
+    
+    // ~~ Declare vars ~~
+    // Bridge
+    cv_bridge::CvImage cv_image_color;
+    cv_image_color.encoding = "bgr8";
+    // Image Msg
+    sensor_msgs::Image ros_image_color;
     
     while (nh_.ok() && waitKey(1) < 0) 
     {
@@ -139,29 +145,27 @@ int main(int argc, char * argv[]) try
             //////////////////////////////////////////////
             // SEND FRAME DATA TO 8-BIT OPENCV MATRICES //
             //////////////////////////////////////////////
-            cv::Mat mat_color(Size(COLOR_WIDTH, COLOR_HEIGHT), CV_8UC3, (void*)frame_color.get_data(), Mat::AUTO_STEP);
+            mat_color = cv::Mat( Size( COLOR_WIDTH , COLOR_HEIGHT ) , CV_8UC3 , (void*)frame_color.get_data() , Mat::AUTO_STEP );
 
             //////////////////////////////////////////
             // CONVERT CV:MAT to SENSOR_MSGS::IMAGE //
             //////////////////////////////////////////
-            cv_bridge::CvImage cv_image_color;
-            cv_image_color.image = mat_color;
-            cv_image_color.encoding = "bgr8";
-            sensor_msgs::Image ros_image_color;
-            cv_image_color.toImageMsg(ros_image_color);
+            cv_image_color.image = mat_color; // ----------- Save the frame from the realsense
+            cv_image_color.toImageMsg( ros_image_color ); // Convert to the ROS format and load into 'ros_image_color'
+            
 
             if(IMSHOW_COLOR)
             {
                 /////////////////////////////////////////
                 // UPDATE IMSHOW VISUALIZATION WINDOWS //
                 /////////////////////////////////////////
-                cv::imshow(window_name_color, mat_color);
+                cv::imshow( window_name_color , mat_color );
             }
 
             ////////////////////////////////////////
             // PUBLISH ROS MESSAGES TO ROS TOPICS //
             ////////////////////////////////////////
-            pub_image_color.publish(ros_image_color);
+            pub_image_color.publish( ros_image_color );
         }
         
 		char c = cv::waitKey(1);
