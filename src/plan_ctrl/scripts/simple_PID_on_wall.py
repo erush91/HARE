@@ -353,21 +353,20 @@ class CarFSM:
         self.preturn_stop = 0.85
         # TODO: control during preturn to 
         self.crnr_drop_dist = 0.65 # Increase in distance of the rightmost reading that will cause transition to the turn state
-        # ~ STATE_blind_right_turn ~
-        self.turning_speed = 0.08 # Speed for 'STATE_blind_rght_turn'
-        self.turning_angle = 1.5 # Turn angle for 'STATE_blind_rght_turn'
         # ~ STATE_collide_recover ~
         self.recover_speed    = -0.15 # Back up at this speed
         self.recover_duration =  0.10 # Minimum time to recover
         self.recover_timeout  = 2.00 # Maximum time to recover
-        self.K_p_careful = 0.014
+        self.K_p_backup = 0.04
+
         # ~ STATE_seek_open ~
         self.seek_speed = 0.10 # Creep forward at this speed
+        self.K_p_creep = 0.05
 
-        _CAREFUL_SETTINGS = 0 # NOTE: SET TO 1 FOR { A. BOX RUN , B. STOP SIGN CHALLENGE? }
+        self._CAREFUL_SETTINGS = 0 # NOTE: SET TO 1 FOR { A. BOX RUN , B. STOP SIGN CHALLENGE? }
 
         # FROZEN SETTINGS FOR CALM DRIVING
-        if _CAREFUL_SETTINGS:
+        if self._CAREFUL_SETTINGS:
             # ~~ State-Specific Constants ~~
             # ~ STATE_forward ~
             self.straight_speed  = 0.18 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
@@ -385,6 +384,14 @@ class CarFSM:
             self.K_p_turn      = 0.015     
             self.preturn_speed = 0.15 # Speed for 'STATE_preturn' # 0.2 is a fast jog/run        
             self.tokyo_drift = False
+            # ~ STATE_collide_recover ~
+            self.recover_speed    = -0.15 # Back up at this speed
+            self.recover_duration =  0.10 # Minimum time to recover
+            self.recover_timeout  = 2.00 # Maximum time to recover
+            self.K_p_backup = 0.04
+            # ~ STATE_seek_open ~
+            self.seek_speed = 0.10 # Creep forward at this speed
+            self.K_p_creep = 0.05
 
     def eval_scan( self ):
         """ Populate the threshold array and return its center """
@@ -620,7 +627,7 @@ class CarFSM:
             self.reason = "UNDER_THRESH"
             self.preturn_start_time = rospy.Time.now().to_sec()
         # Z. Crash Recover Override
-        if self.scan_occluded():
+        if self.scan_occluded() and self._CAREFUL_SETTINGS:
             self.state  = self.STATE_collide_recover
             self.reason = "OCCLUSION"        
 
@@ -672,19 +679,12 @@ class CarFSM:
         if self.FLAG_goodScan:
             self.state  = self.STATE_forward
             self.reason = "OVER_THRESH"
-#        else:
-            #if self.crnr_drop_dist < ( rightMost - right_mean ):
-                #self.state = self.STATE_blind_rght_turn
-                #self.reason = "CORNER_DROP"
-            #else:
-                #self.state = self.STATE_pre_turn
-                #self.reason = "UNDER_THRESH"
         else:
             self.state  = self.STATE_pre_turn
             self.reason = "UNDER_THRESH"
 
         # Z. Crash Recover Override
-        if self.scan_occluded():
+        if self.scan_occluded() and self._CAREFUL_SETTINGS:
             self.state  = self.STATE_collide_recover
             self.reason = "OCCLUSION"                
         
@@ -692,36 +692,7 @@ class CarFSM:
         # ~  IV. Clean / Update ~
         self.prev_rghtmost  = rightMost
         self.old_right_mean = right_mean
-        
 
-    def STATE_blind_rght_turn( self ):
-        """ Turn right at a preset radius until a clear straightaway signal is present """
-
-        SHOWDEBUG = 0
-        if SHOWDEBUG:
-            print "STATE_blind_rght_turn" , self.reason
-
-        # ~   I. State Calcs   ~
-        self.eval_scan() # Assess straight-line driving
-
-        # ~  II. Set controls  ~
-        self.linearSpeed = self.turning_speed
-        self.steerAngle  = self.turning_angle
-
-        # ~ III. Transition Determination ~
-        if self.FLAG_goodScan:
-            self.state  = self.STATE_forward
-            self.reason = "OVER_THRESH"
-        else:
-            self.state  = self.STATE_blind_rght_turn
-            self.reason = "UNDER_THRESH"
-        # Z. Crash Recover Override
-        if self.scan_occluded():
-            self.state  = self.STATE_collide_recover
-            self.reason = "OCCLUSION"            
-
-        # ~  IV. Clean / Update ~
-        # NONE
         
     def STATE_collide_recover( self ):
         """ Back up from a collision """
@@ -734,7 +705,7 @@ class CarFSM:
         # ~  II. Set controls  ~
         self.linearSpeed = self.recover_speed
         # self.steerAngle  = 0.00
-        self.steerAngle  = self.steer_center(self.K_p_careful, reverse = 1 )
+        self.steerAngle  = self.steer_center(self.K_p_backup, reverse = 1 )
         
         # ~ III. Transition Determination ~
         # A. If the min time has not passed, continue to recover
@@ -777,7 +748,7 @@ class CarFSM:
         self.eval_scan()
         # ~  II. Set controls  ~
         self.linearSpeed = self.seek_speed
-        self.steerAngle  = self.steer_center(self.K_p)    
+        self.steerAngle  = self.steer_center(self.K_p_creep)    
         # ~ III. Transition Determination ~
         # a. If there is an open hallway, GO
         if self.FLAG_goodScan:
