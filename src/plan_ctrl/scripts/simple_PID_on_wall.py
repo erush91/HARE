@@ -374,7 +374,7 @@ class CarFSM:
 
         # ~ State-Specific Constants ~
         # STATE_forward
-        self.straight_speed  = 0.3 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
+        self.straight_speed  = 0.32 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
         self.max_thresh_dist = 9.0 # ---------- Above this value we consider distance to be maxed out [m]
         self.thresh_count    = 5 # ------------ If there are at least this many readings above 'self.max_thresh_dist'    
         self.straights_cent_setpoint = int( self.numReadings/2 ) # + 5  # Center of scan with an offset, a positive addition should push the car left
@@ -386,12 +386,12 @@ class CarFSM:
         self.right_side_boost = 2.0
         self.preturn_angle  = 0.5 # Hard-coded turn angle for preturn
         self.turns_cent_setpoint = int( self.numReadings/2 ) # Center of scan with an offset, a positive addition should push the car left
-        self.K_p_turn = 0.05     
+        self.K_p_turn = 0.07     
         self.preturn_speed = 0.25 # Speed for 'STATE_preturn' # 0.2 is a fast jog/run
-        self.tokyo_drift = True
+        self.tokyo_drift = False
         self.drift_speed = 0.0 # full speed to break free tires
-        self.preturn_start = 1.0
-        self.preturn_stop = 1.075
+        self.preturn_start = 0.75
+        self.preturn_stop = 0.85
         # TODO: control during preturn to 
         self.crnr_drop_dist = 0.65 # Increase in distance of the rightmost reading that will cause transition to the turn state
         # STATE_blind_right_turn

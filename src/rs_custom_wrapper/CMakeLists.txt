@@ -69,6 +69,29 @@ add_dependencies(rs_custom_wrapper
   ${catkin_EXPORTED_TARGETS}
 )
 
+# provide library headers
+include_directories(include)
+include_directories(
+  ${catkin_INCLUDE_DIRS}
+  ${OpenCV_INCLUDE_DIRS}
+  color_rs_wrapper.h
+  ) 
+
+add_executable(color_rs_wrapper
+  src/color_rs_wrapper.cpp
+)
+
+target_link_libraries(color_rs_wrapper
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+  /usr/local/lib/librealsense2.so 
+)
+
+add_dependencies(color_rs_wrapper
+  ${${PROJECT_NAME}_EXPORTED_TARGETS} 
+  ${catkin_EXPORTED_TARGETS}
+)
+
 #############
 ## Install ##
 #############
