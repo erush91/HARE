@@ -212,7 +212,7 @@ int main( int argc , char** argv ){ // Main takes the terminal command and flags
     
     sampleBounds = even_index_bounds( imageWidth , numPts );
     std::vector<uint> widths = elem_count_bounds( sampleBounds );
-    for( uint i = 0 ; i < numPts ; i++ ){  blockLen[i] = widths[i] * 1.0 * numLin;  }
+    for( uint i = 0 ; i < numPts ; i++ ){  blockLen[i] = widths[i] * 1.0 * numLin / 2.0;  }
     	
     // B. Instantiate message
     std_msgs::Float32MultiArray flt_dist_msg;

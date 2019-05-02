@@ -332,8 +332,8 @@ class CarFSM:
 
         # ~~ State-Specific Constants ~~
         # ~ STATE_forward ~
-        self.straight_speed  = 0.22 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
-        self.max_thresh_dist = 9.0 # ---------- Above this value we consider distance to be maxed out [m]
+        self.straight_speed  = 0.3 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
+        self.max_thresh_dist = 9.0 # ---------- Above this value we consider distance to be maxed out [m]  # TODO: Try 8 for tighter turns
         self.thresh_count    = 5 # ------------ If there are at least this many readings above 'self.max_thresh_dist'    
         self.straights_cent_setpoint = int( self.numReadings/2 ) # + 5  # Center of scan with an offset, a positive addition should push the car left
         self.K_p_straight = self.K_p        
@@ -344,7 +344,7 @@ class CarFSM:
         self.right_side_boost = 2.0
         self.preturn_angle  = 0.5 # Hard-coded turn angle for preturn
         self.turns_cent_setpoint = int( self.numReadings/2 ) # Center of scan with an offset, a positive addition should push the car left
-        self.K_p_turn = 0.07     
+        self.K_p_turn = 0.05     
         self.preturn_speed = 0.15 # Speed for 'STATE_preturn' # 0.2 is a fast jog/run        
         self.tokyo_drift = False
         # Drifting Vars
@@ -366,24 +366,24 @@ class CarFSM:
 
         _CAREFUL_SETTINGS = 0 # NOTE: SET TO 1 FOR { A. BOX RUN , B. STOP SIGN CHALLENGE? }
 
-        # TODO: FREEZE SETTINGS FOR CALM DRIVING
+        # FROZEN SETTINGS FOR CALM DRIVING
         if _CAREFUL_SETTINGS:
             # ~~ State-Specific Constants ~~
             # ~ STATE_forward ~
-            self.straight_speed  = 0.32 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
+            self.straight_speed  = 0.18 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
             self.max_thresh_dist = 9.0 # ---------- Above this value we consider distance to be maxed out [m]
             self.thresh_count    = 5 # ------------ If there are at least this many readings above 'self.max_thresh_dist'    
             self.straights_cent_setpoint = int( self.numReadings/2 ) # + 5  # Center of scan with an offset, a positive addition should push the car left
-            self.K_p_straight = self.K_p        
-            self.K_d_straight = self.K_d 
-            self.K_i_straight = self.K_i
+            self.K_p_straight = 0.0325        
+            self.K_d_straight = 0.0085 
+            self.K_i_straight = 0.0000
             # ~ STATE_preturn ~
             self.preturn_max_thresh_dist = 5.0
-            self.right_side_boost = 2.0
-            self.preturn_angle  = 0.5 # Hard-coded turn angle for preturn
+            self.right_side_boost        = 2.0
+            self.preturn_angle           = 0.5 # Hard-coded turn angle for preturn
             self.turns_cent_setpoint = int( self.numReadings/2 ) # Center of scan with an offset, a positive addition should push the car left
-            self.K_p_turn = 0.07     
-            self.preturn_speed = 0.25 # Speed for 'STATE_preturn' # 0.2 is a fast jog/run        
+            self.K_p_turn      = 0.015     
+            self.preturn_speed = 0.15 # Speed for 'STATE_preturn' # 0.2 is a fast jog/run        
             self.tokyo_drift = False
 
     def eval_scan( self ):
@@ -406,9 +406,9 @@ class CarFSM:
             self.above_thresh = np.where( self.lastScanNP > self.preturn_max_thresh_dist )[0]
             self.sorted_scan_inds = self.lastScanNP.argsort() # sorted from smallest to largest
             self.N_largest_inds = self.sorted_scan_inds[-self.num_largest:]
-            if len( self.above_thresh ) >=self.thresh_count:
-                pass
-            else: print('didnt expect this, could be a problem')
+            #if len( self.above_thresh ) >=self.thresh_count:
+            #    pass
+            #else: print('didnt expect this, could be a problem')
             
         if SHOWDEBUG:
             print "Scan: ___________" , self.lastScan
