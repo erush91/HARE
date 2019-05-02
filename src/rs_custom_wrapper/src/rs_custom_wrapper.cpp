@@ -33,7 +33,8 @@ int main(int argc, char * argv[]) try
     // GET PARAMETERS //
     ////////////////////
 
-    bool CV_IMSHOW_VISUALIZER_FLAG = 0;
+    bool IMSHOW_DEPTH = 0;
+    bool IMSHOW_INFRARED = 0;
     bool DEPTH_RGB_FLAG = 0;
     bool DEPTH_METERS_FLAG = 1;
     bool LASER_FLAG = 0;
@@ -48,22 +49,14 @@ int main(int argc, char * argv[]) try
     int INFRARED_HEIGHT = 480;
     int INFRARED_FPS = 30;
 
-    bool COLOR_FLAG = 0;
-    int COLOR_WIDTH = 848;
-    int COLOR_HEIGHT = 480;
-    int COLOR_FPS = 30;
-
     bool IMU_FLAG = 0;
 
-    nh_.param("CV_IMSHOW_VISUALIZER_FLAG", CV_IMSHOW_VISUALIZER_FLAG, CV_IMSHOW_VISUALIZER_FLAG);
+    nh_.param("IMSHOW_DEPTH", IMSHOW_DEPTH, IMSHOW_DEPTH);
+    nh_.param("IMSHOW_INFRARED", IMSHOW_INFRARED, IMSHOW_INFRARED);
+    //nh_.param("IMSHOW_COLOR", IMSHOW_COLOR, IMSHOW_COLOR);
     nh_.param("DEPTH_RGB_FLAG", DEPTH_RGB_FLAG, DEPTH_RGB_FLAG);
-    
-    if( 1 ) // DIRTY HACK
-        DEPTH_METERS_FLAG = true;
-    else
-        nh_.param("/rs_custom_wrapper/DEPTH_METERS_FLAG", DEPTH_METERS_FLAG, DEPTH_METERS_FLAG);
-    
-    nh_.param("LASER_FLAG", LASER_FLAG, CV_IMSHOW_VISUALIZER_FLAG);
+    nh_.param("DEPTH_METERS_FLAG", DEPTH_METERS_FLAG, DEPTH_METERS_FLAG);
+    nh_.param("LASER_FLAG", LASER_FLAG, LASER_FLAG);
     
     nh_.param("DEPTH_FLAG", DEPTH_FLAG, DEPTH_FLAG);
     nh_.param("DEPTH_WIDTH", DEPTH_WIDTH, DEPTH_WIDTH);
@@ -74,11 +67,6 @@ int main(int argc, char * argv[]) try
     nh_.param("INFRARED_WIDTH", INFRARED_WIDTH, INFRARED_WIDTH);
     nh_.param("INFRARED_HEIGHT", INFRARED_HEIGHT, INFRARED_HEIGHT);
     nh_.param("INFRARED_FPS", INFRARED_FPS, INFRARED_FPS);
-
-    nh_.param("COLOR_FLAG", COLOR_FLAG, COLOR_FLAG);
-    nh_.param("COLOR_WIDTH", COLOR_WIDTH, COLOR_WIDTH);
-    nh_.param("COLOR_HEIGTH", COLOR_HEIGHT, COLOR_HEIGHT);
-    nh_.param("COLOR_FPS", COLOR_FPS, COLOR_FPS);
 
     nh_.param("IMU_FLAG", IMU_FLAG, IMU_FLAG);
 
@@ -101,12 +89,15 @@ int main(int argc, char * argv[]) try
     // Create a configuration for configuring the pipeline with a non default profile
     rs2::config cfg;
 
-    //////////////////////////////
-    // SET REALSENSE FRAME SIZE //
-    //////////////////////////////
+    /////////////////////////////////
+    // SET REALSENSE STREAM PARAMS //
+    /////////////////////////////////
 
-    // Configured depth stream
-    cfg.enable_stream(RS2_STREAM_DEPTH, DEPTH_WIDTH, DEPTH_HEIGHT, RS2_FORMAT_Z16, DEPTH_FPS);
+    if (DEPTH_FLAG)
+    {
+        // Configured depth stream
+        cfg.enable_stream(RS2_STREAM_DEPTH, DEPTH_WIDTH, DEPTH_HEIGHT, RS2_FORMAT_Z16, DEPTH_FPS);
+    }
 
     // Configured IMU stream
     if (IMU_FLAG)
@@ -118,9 +109,9 @@ int main(int argc, char * argv[]) try
     // Configured left infrared stream
     // https://github.com/IntelRealSense/librealsense/issues/1140
     if (INFRARED_FLAG)
-    {
-        cfg.enable_stream(RS2_STREAM_INFRARED, 1, INFRARED_WIDTH, INFRARED_HEIGHT, RS2_FORMAT_Y8, INFRARED_FPS);
-        cfg.enable_stream(RS2_STREAM_INFRARED, 2, INFRARED_WIDTH, INFRARED_HEIGHT, RS2_FORMAT_Y8, COLOR_FPS);
+    {   // https://github.com/IntelRealSense/librealsense/issues/1140#issuecomment-364737911
+        cfg.enable_stream(RS2_STREAM_INFRARED, 1, INFRARED_WIDTH, INFRARED_HEIGHT, RS2_FORMAT_Y8, INFRARED_FPS); // left
+        cfg.enable_stream(RS2_STREAM_INFRARED, 2, INFRARED_WIDTH, INFRARED_HEIGHT, RS2_FORMAT_Y8, INFRARED_FPS); // right
     }
     
     // Instruct pipeline to start streaming with the requested configuration
@@ -180,19 +171,16 @@ int main(int argc, char * argv[]) try
     const auto window_name_depth = "Depth";
     const auto window_name_infrared_left = "IR (Left)";
     const auto window_name_infrared_right = "IR (Right)";
-        
-    if (CV_IMSHOW_VISUALIZER_FLAG)
+
+    if (IMSHOW_DEPTH)
     {
-        if (DEPTH_FLAG)
-        {
-            namedWindow(window_name_depth, WINDOW_AUTOSIZE);
-        }
-    
-        if (INFRARED_FLAG)
-        {
-            namedWindow(window_name_infrared_left, WINDOW_AUTOSIZE);        
-            namedWindow(window_name_infrared_right, WINDOW_AUTOSIZE);
-        }
+        namedWindow(window_name_depth, WINDOW_AUTOSIZE);
+    }
+
+    if (IMSHOW_INFRARED)
+    {
+        namedWindow(window_name_infrared_left, WINDOW_AUTOSIZE);        
+        namedWindow(window_name_infrared_right, WINDOW_AUTOSIZE);
     }
 
     //////////////////////////////
@@ -209,7 +197,7 @@ int main(int argc, char * argv[]) try
 
     // Setup IMU publisher
     ros::Publisher pub_imu = nh_.advertise<sensor_msgs::Imu>("/imu/raw", 1);
-    
+
     // Pre-allocate the depth matrix and message
     cv::Mat mat_depth_meters(Size(DEPTH_WIDTH, DEPTH_HEIGHT), CV_32FC1);
 
@@ -309,7 +297,7 @@ int main(int argc, char * argv[]) try
                 sensor_msgs::Image ros_image_depth_RGB;
                 cv_image_depth_RGB.toImageMsg(ros_image_depth_RGB);
 
-                if(CV_IMSHOW_VISUALIZER_FLAG)
+                if(IMSHOW_DEPTH)
                 {
                     /////////////////////////////////////////
                     // UPDATE IMSHOW VISUALIZATION WINDOWS //
@@ -327,7 +315,6 @@ int main(int argc, char * argv[]) try
             {
                 // Obtain depth image (meters) for calculations
                 mat_depth_16b.convertTo(mat_depth_meters, CV_32F, scale);
-//                mat_depth_meters.reshape(0,1); 
                 
                 // copy in the data
                 depth_msg.data.clear();
@@ -370,7 +357,7 @@ int main(int argc, char * argv[]) try
             cv_image_infrared_left.toImageMsg(ros_image_infrared_left);
             cv_image_infrared_right.toImageMsg(ros_image_infrared_right);
 
-            if( CV_IMSHOW_VISUALIZER_FLAG)
+            if( IMSHOW_INFRARED )
             {
                 /////////////////////////////////////////
                 // UPDATE IMSHOW VISUALIZATION WINDOWS //

@@ -332,7 +332,7 @@ class CarFSM:
 
         # ~ State-Specific Constants ~
         # STATE_forward
-        self.straight_speed  = 0.3 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
+        self.straight_speed  = 0.32 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
         self.max_thresh_dist = 9.0 # ---------- Above this value we consider distance to be maxed out [m]
         self.thresh_count    = 5 # ------------ If there are at least this many readings above 'self.max_thresh_dist'    
         self.straights_cent_setpoint = int( self.numReadings/2 ) # + 5  # Center of scan with an offset, a positive addition should push the car left
@@ -344,10 +344,12 @@ class CarFSM:
         self.right_side_boost = 2.0
         self.preturn_angle  = 0.5 # Hard-coded turn angle for preturn
         self.turns_cent_setpoint = int( self.numReadings/2 ) # Center of scan with an offset, a positive addition should push the car left
-        self.K_p_turn = 0.05     
-        self.preturn_speed = 0.15 # Speed for 'STATE_preturn' # 0.2 is a fast jog/run
+        self.K_p_turn = 0.07     
+        self.preturn_speed = 0.25 # Speed for 'STATE_preturn' # 0.2 is a fast jog/run
         self.tokyo_drift = False
-        self.drift_speed = 1.0 # full speed to break free tires
+        self.drift_speed = 0.0 # full speed to break free tires
+        self.preturn_start = 0.75
+        self.preturn_stop = 0.85
         # TODO: control during preturn to 
         self.crnr_drop_dist = 0.65 # Increase in distance of the rightmost reading that will cause transition to the turn state
         # STATE_blind_right_turn
@@ -371,7 +373,6 @@ class CarFSM:
         # 1.5 Grab N largest 
         self.sorted_scan_inds = self.lastScanNP.argsort() # sorted from smallest to largest
         self.N_largest_inds = self.sorted_scan_inds[-self.num_largest:]
-        # self.largest = self.lastScanNP[self.N_largest_inds]
 
         # 2. Predicate: Was the latest scan a good scan?
         if len( self.above_thresh ) >= self.thresh_count:
@@ -382,7 +383,6 @@ class CarFSM:
             self.above_thresh = np.where( self.lastScanNP > self.preturn_max_thresh_dist )[0]
             self.sorted_scan_inds = self.lastScanNP.argsort() # sorted from smallest to largest
             self.N_largest_inds = self.sorted_scan_inds[-self.num_largest:]
-            # self.largest = self.lastScanNP[self.N_largest_inds]
             if len( self.above_thresh ) >=self.thresh_count:
                 pass
             else: print('didnt expect this, could be a problem')
@@ -492,6 +492,7 @@ class CarFSM:
         
     def steer_center( self , P_gain , reverse = 0 , useAlt = True ):
         """ PID Controller on the max value of the scan , Return steering command """
+        useID = False
         # 1. Use the alternate (tight/occlusion) scan unless the user specifies
         if useAlt:
             filtScan = avg_filter( self.ocldScanNP ) # does some level of filtering on the scan
@@ -506,8 +507,12 @@ class CarFSM:
         # Calc a new effort 
         translation_err  = self.update_err( centrDex , self.cent_setpoint )
         self.currUp      = P_gain * translation_err
-        self.currUi      = self.K_i * self.integrate_err()
-        self.currUd      = self.K_d * self.rate_err() # This should be a
+        if useID:
+            self.currUi      = self.K_i * self.integrate_err()
+            self.currUd      = self.K_d * self.rate_err() # This should be a
+        else:
+            self.currUi = 0.0
+            self.currUd = 0.0
         auto_steer       = self.currUp + self.currUi + self.currUd # NOTE: P-ctrl only for demo
         # Return the total PID steer effort, reversing if 
         return auto_steer * factor
@@ -610,6 +615,7 @@ class CarFSM:
 
         # ~   I. State Calcs   ~
         self.preturn_timer = rospy.Time.now().to_sec() - self.preturn_start_time
+        # print(self.preturn_timer)
         cent_of_maxes = self.eval_scan()
         input_center  = self.eval_scan()
         rightMost     = self.lastScanNP[-1]
@@ -626,7 +632,7 @@ class CarFSM:
             auto_steer       = self.currUp
             self.steerAngle  = auto_steer # Control Effort
             if self.tokyo_drift:
-                if 0.25 < self.preturn_timer < 0.5:
+                if self.preturn_start < self.preturn_timer and self.preturn_timer < self.preturn_stop:
                     self.linearSpeed = self.drift_speed
                 else: 
                     self.linearSpeed = self.preturn_speed
