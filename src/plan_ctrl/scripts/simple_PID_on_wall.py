@@ -342,17 +342,20 @@ class CarFSM:
         # ~ STATE_preturn ~
         self.preturn_max_thresh_dist = 5.0
         self.right_side_boost = 2.0
-        self.preturn_angle  = 0.5 # Hard-coded turn angle for preturn
         self.turns_cent_setpoint = int( self.numReadings/2 ) # Center of scan with an offset, a positive addition should push the car left
         self.K_p_turn = 0.05     
         self.preturn_speed = 0.15 # Speed for 'STATE_preturn' # 0.2 is a fast jog/run        
         self.tokyo_drift = False
         # Drifting Vars
         self.drift_speed = 0.0 # full speed to break free tires
-        self.preturn_start = 0.75
-        self.preturn_stop = 0.85
-        # TODO: control during preturn to 
-        self.crnr_drop_dist = 0.65 # Increase in distance of the rightmost reading that will cause transition to the turn state
+        self.drift_start = 0.0 # 0.75 was this, setting to 0 to visualize when the steering angle trigger happens
+        self.drift_duration = 1.0 # 0.100 # milliseconds, set very high to ensure spotting the angle trigger
+        self.turn_based_drift = True
+        self.drift_steer_trigger = 0.4 # will need to tune this
+        self.enable_counter_steer = False
+        self.counter_steer_angle = -0.3 # will need to tune this
+        self.counter_steer_start = 0.010 # milliseconds of lag behind beginning of drift
+        self.counter_steer_duration = 0.200
         # ~ STATE_collide_recover ~
         self.recover_speed    = -0.15 # Back up at this speed
         self.recover_duration =  0.10 # Minimum time to recover
@@ -379,7 +382,6 @@ class CarFSM:
             # ~ STATE_preturn ~
             self.preturn_max_thresh_dist = 5.0
             self.right_side_boost        = 2.0
-            self.preturn_angle           = 0.5 # Hard-coded turn angle for preturn
             self.turns_cent_setpoint = int( self.numReadings/2 ) # Center of scan with an offset, a positive addition should push the car left
             self.K_p_turn      = 0.015     
             self.preturn_speed = 0.15 # Speed for 'STATE_preturn' # 0.2 is a fast jog/run        
@@ -560,8 +562,7 @@ class CarFSM:
 
     def STATE_init( self ):
         """ Initial state , Determine the drving mode """
-        self.one_shot = True # unused cuurently, note application if used
-
+        
         SHOWDEBUG = 0
         if SHOWDEBUG:
             print "STATE_init" , self.reason
@@ -626,6 +627,7 @@ class CarFSM:
             self.state  = self.STATE_pre_turn
             self.reason = "UNDER_THRESH"
             self.preturn_start_time = rospy.Time.now().to_sec()
+            self.one_shot = True 
         # Z. Crash Recover Override
         if self.scan_occluded() and self._CAREFUL_SETTINGS:
             self.state  = self.STATE_collide_recover
@@ -641,6 +643,8 @@ class CarFSM:
     def STATE_pre_turn( self ):
         """ Approaching halway end, watch for corner detector """
         self.cent_setpoint = self.turns_cent_setpoint
+        self.drift_stop = self.drift_start + self.drift_duration
+        self.counter_steer_stop = self.counter_steer_start + self.counter_steer_duration
 
         SHOWDEBUG = 0
         if SHOWDEBUG:
@@ -648,7 +652,6 @@ class CarFSM:
 
         # ~   I. State Calcs   ~
         self.preturn_timer = rospy.Time.now().to_sec() - self.preturn_start_time
-        # print(self.preturn_timer)
         cent_of_maxes = self.eval_scan()
         input_center  = self.eval_scan()
         rightMost     = self.lastScanNP[-1]
@@ -656,24 +659,32 @@ class CarFSM:
         right_mean = np.mean( self.rhgt_rolling )
 
         # ~  II. Set controls  ~
-        # self.steerAngle = self.preturn_angle
         if self.FLAG_goodScan: pass # will transition below
         else: 
-            # new scheme
             translation_err  = self.update_err( input_center , self.cent_setpoint )
             self.currUp      = self.K_p_turn * translation_err
             auto_steer       = self.currUp
             self.steerAngle  = auto_steer # Control Effort
+            # --------- drifting code 
             if self.tokyo_drift:
-                if self.preturn_start < self.preturn_timer and self.preturn_timer < self.preturn_stop:
+                if self.turn_based_drift: # reset the timer so it starts during the turn section
+                    if self.currUp > self.drift_steer_trigger and self.one_shot: # start timer once the car begins its right turn
+                        self.preturn_start_time = rospy.Time.now().to_sec()
+                        self.one_shot = False
+                    elif self.one_shot:
+                        self.preturn_start_time = rospy.Time.now().to_sec() # keep spinning the timer till turn angle is hit
+                if self.drift_start < self.preturn_timer < self.drift_stop:
                     self.linearSpeed = self.drift_speed
                 else: 
                     self.linearSpeed = self.preturn_speed
-            else:
+                
+                if self.enable_counter_steer:
+                    if self.drift_start + self.counter_steer_start < self.preturn_timer < self.drift_start + self.counter_steer_stop:
+                        self.steerAngle = self.counter_steer_angle
+    
+            else: # --------- end drifting code 
                 self.linearSpeed = self.preturn_speed 
-            # timing var here
 
-        # IDEA: Possible deceleration phase ??
 
         # ~ III. Transition Determination ~
         if self.FLAG_goodScan:
