@@ -221,6 +221,9 @@ class CarFSM:
         self.prevLinarSpeed = 0.0
         self.angleDiffMin   = rospy.get_param( "ANGLE_DIFF_MIN" ) # limits micro commands
         self.linearSpeed    = rospy.get_param( "LINEAR_SPEED"   ) # [ -1 ,  1 ]    
+	# ~ Tracking Memory ~
+	self.trackDex = 0
+	self.targetLc = False	
 
         # 8. Test vars
         self.t_test = 0.0
@@ -554,6 +557,47 @@ class CarFSM:
         auto_steer       = self.currUp + self.currUi + self.currUd # NOTE: P-ctrl only for demo
         # Return the total PID steer effort, reversing if 
         return auto_steer * factor
+    
+    @staticmethod
+    def index_of_max_half( arr ):
+	""" Choose the half of 'arr' that has the highest average , and return the overall index of the max of that half """
+	mid   = len( arr ) // 2
+	left  = arr[:mid]
+	rght  = arr[mid:]
+	if np.average( left ) > np.average( rght ):
+	    return left.index( max( left ) )
+	else:
+	    return mid + rght.index( max( rght ) )
+    
+    def lock_and_seek( self , P_gain , reverse = 0 , useAlt = True ):
+	""" Find the center of the half with the highest average, and track it """
+	searchWidth = 8
+	cenDex      = self.numReadings//2
+	# 0. Load appropriate arr
+	if useAlt:
+	    trackScan = self.ocldScan
+	else:
+	    trackScan = self.lastScan
+	# 1. If we have not locked onto a target, then do so
+	if not self.targetLc:
+	    self.trackDex = index_of_max_half( trackScan )
+	    self.targetLc = True
+	# 2. Assuming we have target lock, search the viscinity of the last lock and update lock index
+	loDex  = max( 0                , self.trackDex - searchWidth )
+	hiDex  = min( len( trackScan ) , self.trackDex + searchWidth )
+	window = trackScan[ loDex : hiDex ]
+	self.trackDex = loDex + window.index( max( window ) )
+	# 2. Reverse if the user specifies
+	if reverse:
+	    factor = -1.0
+	else:
+	    factor =  1.0	
+	# 3. Calc error to lock location
+	translation_err = self.update_err( self.trackDex , centrDex )
+	self.currUp     = P_gain * translation_err
+	auto_steer      = self.currUp + self.currUi + self.currUd # NOTE: P-ctrl only for demo
+	# Return the total PID steer effort, reversing if 
+	return ( auto_steer * factor ) , ( translation_err < searchWidth )
 
     """
     STATE_funcname
@@ -707,8 +751,10 @@ class CarFSM:
         # ~  II. Set controls  ~
         self.linearSpeed = self.recover_speed
         # self.steerAngle  = 0.00
-        self.steerAngle  = self.steer_center(self.K_p_backup, reverse = 1 )
-        
+	if 1:
+	    self.steerAngle = self.steer_center( self.K_p_backup , reverse = 1 )
+	else:
+	    self.steerAngle , found = self.lock_and_seek( self.K_p_backup , reverse = 1 )
         # ~ III. Transition Determination ~
         # A. If the min time has not passed, continue to recover
         nowTime = rospy.Time.now().to_sec()
@@ -735,9 +781,10 @@ class CarFSM:
                     self.state       = self.STATE_init
                     self.reason      = "RECOVERY_FAILURE"        
                     self.FLAG_backup = False
-        
         # ~  IV. Clean / Update ~        
-        # NONE
+	if self.state != self.STATE_collide_recover:
+	    self.clear_PID()
+	    self.targetLc = False
         
     def STATE_seek_open( self ):
         """ Slowly drive towards the most open portion of the scan """
@@ -748,7 +795,10 @@ class CarFSM:
             self.creep_bgn_time = rospy.Time.now().to_sec()        
         # ~  II. Set controls  ~
         self.linearSpeed = self.seek_speed
-        self.steerAngle  = self.steer_center(self.K_p_creep)    
+	if 1:
+	    self.steerAngle = self.steer_center( self.K_p_creep )    
+	else:
+	    self.steerAngle , found = self.lock_and_seek( self.K_p_creep )	    
         # ~ III. Transition Determination ~
         # a. If there is an open hallway, GO
         nowTime = rospy.Time.now().to_sec()
@@ -768,6 +818,7 @@ class CarFSM:
         # If we are exiting the state, then clear the PID
         if self.state != self.STATE_seek_open:
             self.clear_PID()
+	    self.targetLc = False
 
     def hallway_FSM( self ):
         """ Execute state actions and record current status """
