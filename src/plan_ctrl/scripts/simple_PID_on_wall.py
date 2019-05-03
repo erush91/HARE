@@ -341,7 +341,7 @@ class CarFSM:
         self.K_i_straight = self.K_i
         # ~ STATE_preturn ~
         self.preturn_max_thresh_dist = 5.0
-        self.right_side_boost = 2.0
+        self.right_side_boost = 4.0 # was 2 
         self.turns_cent_setpoint = int( self.numReadings/2 ) # Center of scan with an offset, a positive addition should push the car left
         self.K_p_turn = 0.08
         self.preturn_speed = 0.2 # Speed for 'STATE_preturn' # 0.2 is a fast jog/run        
@@ -351,7 +351,7 @@ class CarFSM:
         self.drift_start = 0.0 # 0.75 was this, setting to 0 to visualize when the steering angle trigger happens
         self.drift_duration = 1.0 # 0.100 # milliseconds, set very high to ensure spotting the angle trigger
         self.turn_based_drift = True
-        self.drift_steer_trigger = 0.4 # will need to tune this
+        self.drift_steer_trigger = 0.75 # will need to tune this
         self.enable_counter_steer = False
         self.counter_steer_angle = -0.3 # will need to tune this
         self.counter_steer_start = 0.010 # milliseconds of lag behind beginning of drift
@@ -690,6 +690,7 @@ class CarFSM:
         if self.FLAG_goodScan:
             self.state  = self.STATE_forward
             self.reason = "OVER_THRESH"
+            self.clear_PID()
         else:
             self.state  = self.STATE_pre_turn
             self.reason = "UNDER_THRESH"
