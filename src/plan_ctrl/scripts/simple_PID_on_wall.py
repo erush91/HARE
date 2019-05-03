@@ -185,8 +185,6 @@ class CarFSM:
         # 3.5.1. Driving Scan 
         self.numReadings     = 100
         self.num_right_scans =   5
-        self.old_right_mean  =   0.0 # np.ones((self.num_right_scans))*20
-        self.prev_rghtmost   =   0.0
         self.scanCenter      = int( self.numReadings//2 ) # + 5 # Cetner of scan with an offset
         self.lastScan        = [ 0.0 for i in range( self.numReadings ) ]
         self.lastScanNP      = np.asarray( self.lastScan )
@@ -311,7 +309,6 @@ class CarFSM:
         self.wallSetPnt      =  1.0 # [m]
         self.nearN           = 30 # Count this many points as near the average
         self.slope_window    =  2 # Look this many points in the past to compute slope
-        self.rhgt_rolling    = ListRoll( self.num_right_scans )    
         self.sum_err         = 0 # used for integral error   
         self.err_win_old     = [0]*2
         self.err_win_new     = [0]*2    
@@ -366,7 +363,7 @@ class CarFSM:
         self.seek_speed = 0.10 # Creep forward at this speed
         self.K_p_creep = 0.3
 
-        self._CAREFUL_SETTINGS = 1 # NOTE: SET TO 1 FOR { A. BOX RUN , B. STOP SIGN CHALLENGE? }
+        self._CAREFUL_SETTINGS = 0 # NOTE: SET TO 1 FOR { A. BOX RUN , B. STOP SIGN CHALLENGE? }
 
         # FROZEN SETTINGS FOR CALM DRIVING
         if self._CAREFUL_SETTINGS:
@@ -523,7 +520,6 @@ class CarFSM:
         self.tim_hist = [0]*self.err_hist_window 
         self.sum_err = 0
         self.err_derivative  = 0
-        # self.rhgt_rolling.zero_out()
         
     def steer_center( self , P_gain , reverse = 0 , useAlt = True ):
         """ PID Controller on the max value of the scan , Return steering command """
@@ -600,9 +596,6 @@ class CarFSM:
         # ~   I. State Calcs   ~
         # 1. Calculate and store error
         input_center = self.eval_scan()
-        rightMost  = self.lastScanNP[-1]
-        self.rhgt_rolling.add( rightMost )
-        right_mean = np.mean( self.rhgt_rolling )
 
         # ~  II. Set controls  ~
         # Calc a new forward effort only if there is a good hallway scan
@@ -634,8 +627,6 @@ class CarFSM:
             self.reason = "OCCLUSION"        
 
         # ~  IV. Clean / Update ~
-        self.old_right_mean = right_mean
-        self.prev_rghtmost  = rightMost
         # If we are exiting the state, then clear the PID
         if self.state != self.STATE_forward:
             self.clear_PID()
@@ -652,11 +643,7 @@ class CarFSM:
 
         # ~   I. State Calcs   ~
         self.preturn_timer = rospy.Time.now().to_sec() - self.preturn_start_time
-        cent_of_maxes = self.eval_scan()
         input_center  = self.eval_scan()
-        rightMost     = self.lastScanNP[-1]
-        self.rhgt_rolling.add( rightMost )
-        right_mean = np.mean( self.rhgt_rolling )
 
         # ~  II. Set controls  ~
         if self.FLAG_goodScan: pass # will transition below
@@ -699,11 +686,6 @@ class CarFSM:
         if self.scan_occluded() and self._CAREFUL_SETTINGS:
             self.state  = self.STATE_collide_recover
             self.reason = "OCCLUSION"                
-        
-
-        # ~  IV. Clean / Update ~
-        self.prev_rghtmost  = rightMost
-        self.old_right_mean = right_mean
 
         
     def STATE_collide_recover( self ):
