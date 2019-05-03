@@ -349,8 +349,8 @@ class CarFSM:
         self.K_d_straight = self.K_d 
         self.K_i_straight = self.K_i
         # ~ STATE_preturn ~
-        self.preturn_max_thresh_dist_nrm = 5.0
-        self.preturn2_max_thresh_dist = self.preturn_max_thresh_dist_nrm + 1.0
+        self.preturn_max_thresh_dist_nrm = 6.5
+        self.preturn2_max_thresh_dist = self.preturn_max_thresh_dist_nrm + 1.5
         self.preturn_max_thresh_dist = self.preturn_max_thresh_dist_nrm # set to make sure its defined initially
         self.right_side_boost = 2.0 # was 2 
         self.turns_cent_setpoint = int( self.numReadings/2 ) # Center of scan with an offset, a positive addition should push the car left
@@ -360,7 +360,7 @@ class CarFSM:
         # Drifting Vars
         self.drift_speed = 1.0 # full speed to break free tires
         self.drift_start = 0.25 # 0.75 was this, setting to 0 to visualize when the steering angle trigger happens
-        self.drift_duration = .310 # 0.100 # milliseconds, set very high to ensure spotting the angle trigger
+        self.drift_duration = .330 # 0.100 # milliseconds, set very high to ensure spotting the angle trigger
         self.t2_drift_duration = 0.25
         self.turn_based_drift = True
         self.drift_steer_trigger = 0.75 
