@@ -330,16 +330,25 @@ class CarFSM:
         self.num_largest     = 15 # ------------ Fix number of largest vals to search for 
 
         # ~~ State-Specific Constants ~~
+        self.two_turn_gains = False # modify some gains to account for the physical differences in the second turn
+        self.turn_count = 0 # counts turns
+        self.turn_debounce = True
+        self.turn_count_db_dur = 0.200 # ah don't really know how long we typically spend in a turn
         # ~ STATE_forward ~
+        self.forward_timer = rospy.Time.now().to_sec()
         self.straight_speed  = 0.28 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
-        self.max_thresh_dist = 8.5 # ---------- Above this value we consider distance to be maxed out [m]  # TODO: Try 8 for tighter turns
+        self.max_thresh_dist_nrm = 8.5 # ---------- Above this value we consider distance to be maxed out [m]  # TODO: Try 8 for tighter turns
+        self.turn2_max_thresh_dist = self.max_thresh_dist_nrm - 1
+        self.max_thresh_dist = self.max_thresh_dist_nrm # set to make sure its defined initially
         self.thresh_count    = 5 # ------------ If there are at least this many readings above 'self.max_thresh_dist'    
         self.straights_cent_setpoint = int( self.numReadings/2 )  + 1.0  # Center of scan with an offset, a positive addition should push the car left
         self.K_p_straight = self.K_p        
         self.K_d_straight = self.K_d 
         self.K_i_straight = self.K_i
         # ~ STATE_preturn ~
-        self.preturn_max_thresh_dist = 5.0
+        self.preturn_max_thresh_dist_nrm = 5.0
+        self.preturn2_max_thresh_dist = self.preturn_max_thresh_dist_nrm - 1
+        self.preturn_max_thresh_dist = self.preturn_max_thresh_dist_nrm # set to make sure its defined initially
         self.right_side_boost = 2.0 # was 2 
         self.turns_cent_setpoint = int( self.numReadings/2 ) # Center of scan with an offset, a positive addition should push the car left
         self.K_p_turn = 0.10
@@ -527,7 +536,7 @@ class CarFSM:
     def steer_center( self , P_gain , reverse = 0 , useAlt = True ):
         """ PID Controller on the max value of the scan , Return steering command """
         useID = False
-	qFltr = False
+        qFltr = False
         # 1. Use the alternate (tight/occlusion) scan unless the user specifies
         if useAlt:
             if qFltr:
@@ -573,6 +582,8 @@ class CarFSM:
         # ~   I. State Calcs   ~
         self.eval_scan() # Assess straight-line driving
         self.reset_time()
+        self.turn_count = 0 # reset the turn count
+        self.turn_debounce = True # ensure debounce is reset
 
         # ~  II. Set controls  ~
         self.steerAngle  = 0.0
@@ -596,9 +607,18 @@ class CarFSM:
         """ Straightaway driving , Monitor for turn or fault """
         self.cent_setpoint = self.straights_cent_setpoint
 
+        if rospy.Time.now().to_sec() - self.forward_timer > self.turn_count_db_dur:
+            self.turn_debounce = True
+
         SHOWDEBUG = 0
         if SHOWDEBUG:
             print "STATE_forward" , self.reason
+
+        # turn two specifics
+        if self.two_turn_gains and self.turn_count == 2:
+            self.max_thresh_dist = self.turn2_max_thresh_dist
+        else: 
+            self.max_thresh_dist = self.max_thresh_dist_nrm
 
         # ~   I. State Calcs   ~
         # 1. Calculate and store error
@@ -650,7 +670,17 @@ class CarFSM:
 
         # ~   I. State Calcs   ~
         self.preturn_timer = rospy.Time.now().to_sec() - self.preturn_start_time
+        if self.preturn_timer > self.turn_count_db_dur and self.turn_debounce:
+            self.turn_count += 1 # increment the turn counter
+            self.turn_debounce = False
         input_center  = self.eval_scan()
+
+        # turn two specifics
+        if self.two_turn_gains and self.turn_count == 2:
+            self.preturn_max_thresh_dist = self.preturn2_max_thresh_dist
+        else:
+            self.preturn_max_thresh_dist = self.preturn_max_thresh_dist_nrm
+            
 
         # ~  II. Set controls  ~
         if self.FLAG_goodScan: pass # will transition below
@@ -686,6 +716,7 @@ class CarFSM:
             self.state  = self.STATE_forward
             self.reason = "OVER_THRESH"
             self.clear_PID()
+            self.forward_timer = rospy.Time.now().to_sec() # start forward timer
         else:
             self.state  = self.STATE_pre_turn
             self.reason = "UNDER_THRESH"
@@ -815,6 +846,7 @@ class CarFSM:
                 self.reset_time() # Reset the clock so that the car does not get stuck on resume
                 self.clear_PID()
                 self.drive_pub.publish(  compose_HARE_ctrl_msg( self.steerAngle , self.linearSpeed )  )
+                print('Turn count: ',self.turn_count,' this should never be more than 2!!')
             else: # only transmit control effort if not Estopped
                 # 2. Transmit the control effort
                 if (self.FLAG_newCtrl and not self.FLAG_rc_ovrd):
