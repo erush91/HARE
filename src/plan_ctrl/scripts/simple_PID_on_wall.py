@@ -331,7 +331,7 @@ class CarFSM:
 
         # ~~ State-Specific Constants ~~
         # ~ STATE_forward ~
-        self.straight_speed  = 0.3 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
+        self.straight_speed  = 0.28 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
         self.max_thresh_dist = 8.5 # ---------- Above this value we consider distance to be maxed out [m]  # TODO: Try 8 for tighter turns
         self.thresh_count    = 5 # ------------ If there are at least this many readings above 'self.max_thresh_dist'    
         self.straights_cent_setpoint = int( self.numReadings/2 )  + 1.0  # Center of scan with an offset, a positive addition should push the car left
@@ -340,20 +340,20 @@ class CarFSM:
         self.K_i_straight = self.K_i
         # ~ STATE_preturn ~
         self.preturn_max_thresh_dist = 5.0
-        self.right_side_boost = 4.0 # was 2 
+        self.right_side_boost = 2.0 # was 2 
         self.turns_cent_setpoint = int( self.numReadings/2 ) # Center of scan with an offset, a positive addition should push the car left
-        self.K_p_turn = 0.08
-        self.preturn_speed = 0.2 # Speed for 'STATE_preturn' # 0.2 is a fast jog/run        
-        self.tokyo_drift = False
+        self.K_p_turn = 0.10
+        self.preturn_speed = 0.13 # Speed for 'STATE_preturn' # 0.2 is a fast jog/run        
+        self.tokyo_drift = True
         # Drifting Vars
-        self.drift_speed = 0.0 # full speed to break free tires
-        self.drift_start = 0.0 # 0.75 was this, setting to 0 to visualize when the steering angle trigger happens
-        self.drift_duration = 1.0 # 0.100 # milliseconds, set very high to ensure spotting the angle trigger
+        self.drift_speed = 1.0 # full speed to break free tires
+        self.drift_start = 0.5 # 0.75 was this, setting to 0 to visualize when the steering angle trigger happens
+        self.drift_duration = .310 # 0.100 # milliseconds, set very high to ensure spotting the angle trigger
         self.turn_based_drift = True
-        self.drift_steer_trigger = 0.75 # will need to tune this
-        self.enable_counter_steer = False
-        self.counter_steer_angle = -0.3 # will need to tune this
-        self.counter_steer_start = 0.010 # milliseconds of lag behind beginning of drift
+        self.drift_steer_trigger = 0.75 
+        self.enable_counter_steer = True
+        self.counter_steer_angle = -1.0 # will need to tune this
+        self.counter_steer_start = 0.200 # milliseconds of lag behind start of drift
         self.counter_steer_duration = 0.200
         # ~ STATE_collide_recover ~
         self.recover_speed    = -0.15 # Back up at this speed
@@ -365,7 +365,7 @@ class CarFSM:
         self.seek_speed = 0.10 # Creep forward at this speed
         self.K_p_creep = 0.3
 
-        self._CAREFUL_SETTINGS = 0 # NOTE: SET TO 1 FOR { A. BOX RUN , B. STOP SIGN CHALLENGE? }
+        self._CAREFUL_SETTINGS = 1 # NOTE: SET TO 1 FOR { A. BOX RUN , B. STOP SIGN CHALLENGE? }
 
         # FROZEN SETTINGS FOR CALM DRIVING
         if self._CAREFUL_SETTINGS:
@@ -388,8 +388,8 @@ class CarFSM:
             # ~ STATE_collide_recover ~
             self.recover_speed    = -0.15 # Back up at this speed
             self.recover_duration =  0.10 # Minimum time to recover
-            self.recover_timeout  =  4.00 # Maximum time to recover
-            self.K_p_backup = 0.04
+            self.recover_timeout  =  3.00 # Maximum time to recover
+            self.K_p_backup = 0.02
             # ~ STATE_seek_open ~
             self.seek_speed = 0.10 # Creep forward at this speed
             self.K_p_creep = 0.05
@@ -527,9 +527,13 @@ class CarFSM:
     def steer_center( self , P_gain , reverse = 0 , useAlt = True ):
         """ PID Controller on the max value of the scan , Return steering command """
         useID = False
+	qFltr = False
         # 1. Use the alternate (tight/occlusion) scan unless the user specifies
         if useAlt:
-            filtScan = avg_filter( self.ocldScanNP ) # does some level of filtering on the scan
+            if qFltr:
+                filtScan = avg_filter( self.ocldScanNP ) # does some level of filtering on the scan
+            else:
+                filtScan = list( self.ocldScanNP )
         else:
             filtScan = avg_filter( self.lastScanNP ) # does some level of filtering on the scan
         centrDex = max_dex( filtScan )
@@ -665,6 +669,7 @@ class CarFSM:
                         self.preturn_start_time = rospy.Time.now().to_sec() # keep spinning the timer till turn angle is hit
                 if self.drift_start < self.preturn_timer < self.drift_stop:
                     self.linearSpeed = self.drift_speed
+                    self.steerAngle = 1.5 # might need to ditch this....
                 else: 
                     self.linearSpeed = self.preturn_speed
                 
