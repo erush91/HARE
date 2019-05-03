@@ -324,7 +324,9 @@ class CarFSM:
         self.occlude_limit   = 33 # ------------ Minimum number of occluded scan readings that indicate view occlusion
         self.occlude_indices = [] # ------------ Currently occluded indices
         self.FLAG_backup     = False # --------- Flag set at the beginning of the recovery phase
+        self.FLAG_creepF     = False # --------- Flag set at the beginning of the recovery phase
         self.rcovr_bgn_time  = 0.0 # ----------- 
+        self.creep_bgn_time  = 0.0 # ----------- 
         self.num_largest     = 15 # ------------ Fix number of largest vals to search for 
 
         # ~~ State-Specific Constants ~~
@@ -356,7 +358,7 @@ class CarFSM:
         # ~ STATE_collide_recover ~
         self.recover_speed    = -0.15 # Back up at this speed
         self.recover_duration =  0.20 # Minimum time to recover
-        self.recover_timeout  = 2.00 # Maximum time to recover
+        self.recover_timeout  =  4.00 # Maximum time to recover
         self.K_p_backup = 0.02
 
         # ~ STATE_seek_open ~
@@ -386,11 +388,12 @@ class CarFSM:
             # ~ STATE_collide_recover ~
             self.recover_speed    = -0.15 # Back up at this speed
             self.recover_duration =  0.10 # Minimum time to recover
-            self.recover_timeout  = 2.00 # Maximum time to recover
+            self.recover_timeout  =  4.00 # Maximum time to recover
             self.K_p_backup = 0.04
             # ~ STATE_seek_open ~
             self.seek_speed = 0.10 # Creep forward at this speed
             self.K_p_creep = 0.05
+            self.creep_timeout = 3.00 # Maximum time to recover
 
     def eval_scan( self ):
         """ Populate the threshold array and return its center """
@@ -714,13 +717,8 @@ class CarFSM:
                 self.FLAG_backup = False
                 self.eval_scan()
                 # a. If there is an open hallway, GO
-                if self.FLAG_goodScan:
-                    self.state  = self.STATE_forward
-                    self.reason = "OVER_THRESH"
-                # b. Else creep forward
-                else:
-                    self.state  = self.STATE_seek_open
-                    self.reason = "UNDER_THRESH"        
+                self.state  = self.STATE_seek_open
+                self.reason = "UNDER_THRESH"        
             # ii. Else the occlusion has not cleared
             else:
                 # iii. If the max time has not elapsed, continue to recover
@@ -740,18 +738,26 @@ class CarFSM:
         """ Slowly drive towards the most open portion of the scan """
         # ~   I. State Calcs   ~
         self.eval_scan()
+        if not self.FLAG_creepF:
+            self.FLAG_creepF    = True
+            self.creep_bgn_time = rospy.Time.now().to_sec()        
         # ~  II. Set controls  ~
         self.linearSpeed = self.seek_speed
         self.steerAngle  = self.steer_center(self.K_p_creep)    
         # ~ III. Transition Determination ~
         # a. If there is an open hallway, GO
-        if self.FLAG_goodScan:
-            self.state  = self.STATE_forward
-            self.reason = "OVER_THRESH"
-        # b. Else creep forward
-        else:
+        nowTime = rospy.Time.now().to_sec()
+        if nowTime - self.creep_bgn_time <= self.creep_timeout:
             self.state  = self.STATE_seek_open
-            self.reason = "UNDER_THRESH" 
+            self.reason = "UNDER_MIN_TIME"             
+        else:
+            if self.FLAG_goodScan:
+                self.state  = self.STATE_forward
+                self.reason = "OVER_THRESH"
+            # b. Else creep forward
+            else:
+                self.state  = self.STATE_seek_open
+                self.reason = "UNDER_THRESH" 
    
         # ~  IV. Clean / Update ~
         # If we are exiting the state, then clear the PID

@@ -17,6 +17,7 @@ plotCarts     =   1
 
 # ~~ Variables ~~
 lastScan = [ 0 for i in range( numReadings ) ]
+ocldScan = [ 0 for i in range( numReadings ) ]
 car_state = ''
 up = [0]*30
 ui = [0]*30
@@ -34,6 +35,19 @@ def scan_cb( msg ):
         lastScan = msg.data  #lastScan = [ elem/25.50 for elem in msg.data ] # scale [0,255] to [0,10]
     else: 
         lastScan = msg.intensities 
+
+def altr_cb( msg ):
+    global ocldScan
+    """ Process the scan that comes back from the scanner """
+    # NOTE: Scan progresses from least theta to most theta: CCW
+    # print "Got a scanner message with" , len( msg.intensities ) , "readings!"
+    # ~ print "Scan:" , self.lastScan
+    # print "Scan Min:" , min( self.lastScan ) , ", Scan Max:" , max( self.lastScan )
+
+    if RunningOdroid: 
+        ocldScan = msg.data  #lastScan = [ elem/25.50 for elem in msg.data ] # scale [0,255] to [0,10]
+    else: 
+        ocldScan = msg.intensities 
 
 def polr_2_cart_0Y( polarCoords ): # 0 angle is +Y North 
     """ Convert polar coordinates [radius , angle (radians)] to cartesian [x , y]. Theta = 0 is UP = Y+ """
@@ -63,6 +77,7 @@ rospy.init_node( 'scan_sherlock' , anonymous = True )
 	
 if RunningOdroid: 
     rospy.Subscriber( "/filtered_distance" , Float32MultiArray , scan_cb )
+    rospy.Subscriber( "/alternat_distance" , Float32MultiArray , altr_cb )
     rospy.Subscriber( "/ctrl_state_report" , CarState , state_cb )
 else: 
     rospy.Subscriber( "/scan" , LaserScan , scan_cb )
@@ -70,6 +85,7 @@ else:
 try:
 	while ( not rospy.is_shutdown() ):
 		lastScanNP   = np.asarray( lastScan )
+		ocldScanNP   = np.asarray( ocldScan )
 		above_thresh = np.where( lastScanNP > threshold )[0]
 
 		sorted_scan_inds = lastScanNP.argsort() # sorted from smallest to largest
@@ -108,10 +124,20 @@ try:
 		    Y = [ elem[1] for elem in points ]		    
 		    plt.scatter( X , Y )
 		    plt.axis( 'equal' )
-		    plt.title(car_state)
+		    plt.title( "Regular Cart:\n" + str( car_state) )
 		    
-		if plotCarts: plt.figure(3)
-		else: plt.figure(2)
+		    plt.figure(3)
+		    points = cart_scan( ocldScanNP )
+		    X = [ elem[0] for elem in points ]
+		    Y = [ elem[1] for elem in points ]		    
+		    plt.scatter( X , Y )
+		    plt.axis( 'equal' )
+		    plt.title( "Occlusion Cart:\n" + str( car_state ) )
+		    
+		if plotCarts: 
+		    plt.figure(4)
+		else: 
+		    plt.figure(2)
 		plt.plot(up,'k')
 		plt.hold(True)
 		plt.plot(ui,'g')
