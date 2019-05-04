@@ -240,10 +240,10 @@ class CarFSM:
         self.rc_throttle_mid = 1500
         self.rc_throttle_min = 1000
         # Steering
-        self.rc_steering     =    0.0
-        self.rc_steering_max = 2000
+        self.rc_steering     =  0.0
+        self.rc_steering_max = 2003
         self.rc_steering_mid = 1500
-        self.rc_steering_min = 1000
+        self.rc_steering_min = 1010
         # Flags
         self.FLAG_estop   = False
         self.FLAG_rc_ovrd = False
@@ -339,7 +339,7 @@ class CarFSM:
         self.turn_count_db_dur = 2.0 
         # ~ STATE_forward ~
         self.forward_timer = rospy.Time.now().to_sec()
-        self.straight_speed  = 0.28 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
+        self.straight_speed  = 0.31 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
         self.max_thresh_dist_nrm = 9.0 # ---------- Above this value we consider distance to be maxed out [m]  # TODO: Try 8 for tighter turns
         self.turn2_max_thresh_dist = self.max_thresh_dist_nrm + 1.0
         self.max_thresh_dist = self.max_thresh_dist_nrm # set to make sure its defined initially
@@ -349,12 +349,13 @@ class CarFSM:
         self.K_d_straight = self.K_d 
         self.K_i_straight = self.K_i
         # ~ STATE_preturn ~
-        self.preturn_max_thresh_dist_nrm = 6.5
-        self.preturn2_max_thresh_dist = self.preturn_max_thresh_dist_nrm + 1.5
+        self.preturn_max_thresh_dist_nrm = 7.0
+        self.preturn2_max_thresh_dist = self.preturn_max_thresh_dist_nrm + 1.75
         self.preturn_max_thresh_dist = self.preturn_max_thresh_dist_nrm # set to make sure its defined initially
-        self.right_side_boost = 2.0 # was 2 
+        self.right_side_boost = 2.5 # was 2 
         self.turns_cent_setpoint = int( self.numReadings/2 ) # Center of scan with an offset, a positive addition should push the car left
         self.K_p_turn = 0.10
+	self.K_p_t2   = 0.10
         self.preturn_speed = 0.13 # Speed for 'STATE_preturn' # 0.2 is a fast jog/run        
         self.tokyo_drift = True
         # Drifting Vars
