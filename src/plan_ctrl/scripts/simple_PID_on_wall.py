@@ -339,7 +339,10 @@ class CarFSM:
         self.turn_count_db_dur = 2.0 
         # ~ STATE_forward ~
         self.forward_timer = rospy.Time.now().to_sec()
-        self.straight_speed  = 0.28 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
+        self.dragOn = 0
+        self.drag_speed = 0.5 
+        self.drag_duration = 2.0 # seconds 
+        self.straight_speed  = 0.32 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
         self.max_thresh_dist_nrm = 9.0 # ---------- Above this value we consider distance to be maxed out [m]  # TODO: Try 8 for tighter turns
         self.turn2_max_thresh_dist = self.max_thresh_dist_nrm + 1.0
         self.max_thresh_dist = self.max_thresh_dist_nrm # set to make sure its defined initially
@@ -349,8 +352,8 @@ class CarFSM:
         self.K_d_straight = self.K_d 
         self.K_i_straight = self.K_i
         # ~ STATE_preturn ~
-        self.preturn_max_thresh_dist_nrm = 7.3
-        self.preturn2_max_thresh_dist = self.preturn_max_thresh_dist_nrm + 2.8
+        self.preturn_max_thresh_dist_nrm = 8.25
+        self.preturn2_max_thresh_dist = self.preturn_max_thresh_dist_nrm + 3.20
         self.preturn_max_thresh_dist = self.preturn_max_thresh_dist_nrm # set to make sure its defined initially
         self.right_side_boost = 2.5 # was 2 
         self.turns_cent_setpoint = int( self.numReadings/2 ) # Center of scan with an offset, a positive addition should push the car left
@@ -360,9 +363,9 @@ class CarFSM:
         self.tokyo_drift = True
         # Drifting Vars
         self.drift_speed = 1.0 # full speed to break free tires
-        self.drift_start = 0.23 # 0.75 was this, setting to 0 to visualize when the steering angle trigger happens
-        self.drift_duration = .280 # 0.100 # milliseconds, set very high to ensure spotting the angle trigger
-        self.t2_drift_duration = 0.280
+        self.drift_start = 0.33 + 0.10 # 0.75 was this, setting to 0 to visualize when the steering angle trigger happens
+        self.drift_duration = 0.280 + 0.02 # 0.100 # milliseconds, set very high to ensure spotting the angle trigger
+        self.t2_drift_duration = 0.280 + 0.02
         self.turn_based_drift = True
         self.drift_steer_trigger = 0.75 
         self.enable_counter_steer = True
@@ -671,6 +674,14 @@ class CarFSM:
 
         if rospy.Time.now().to_sec() - self.forward_timer < 1.5:
             self.sum_err = 0
+
+        if self.dragOn:
+            if self.turn_count < 2 and (rospy.Time.now().to_sec() - self.forward_timer) < self.drag_duration:
+                self.linearSpeed = self.drag_speed  
+            else: 
+                self.linearSpeed = self.straight_speed
+
+
         # ~   I. State Calcs   ~
         # 1. Calculate and store error
         input_center = self.eval_scan()
