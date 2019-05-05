@@ -221,9 +221,9 @@ class CarFSM:
         self.prevLinarSpeed = 0.0
         self.angleDiffMin   = rospy.get_param( "ANGLE_DIFF_MIN" ) # limits micro commands
         self.linearSpeed    = rospy.get_param( "LINEAR_SPEED"   ) # [ -1 ,  1 ]    
-	# ~ Tracking Memory ~
-	self.trackDex = 0
-	self.targetLc = False	
+        # ~ Tracking Memory ~
+        self.trackDex = 0
+        self.targetLc = False    
 
         # 8. Test vars
         self.t_test = 0.0
@@ -339,23 +339,23 @@ class CarFSM:
         self.turn_count_db_dur = 2.0 
         # ~ STATE_forward ~
         self.forward_timer = rospy.Time.now().to_sec()
-        self.straight_speed  = 0.31 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
+        self.straight_speed  = 0.28 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
         self.max_thresh_dist_nrm = 9.0 # ---------- Above this value we consider distance to be maxed out [m]  # TODO: Try 8 for tighter turns
         self.turn2_max_thresh_dist = self.max_thresh_dist_nrm + 1.0
         self.max_thresh_dist = self.max_thresh_dist_nrm # set to make sure its defined initially
         self.thresh_count    = 5 # ------------ If there are at least this many readings above 'self.max_thresh_dist'    
-        self.straights_cent_setpoint = int( self.numReadings/2 )  + 1.0  # Center of scan with an offset, a positive addition should push the car left
+        self.straights_cent_setpoint = int( self.numReadings/2 )  + 2.25  # Center of scan with an offset, a positive addition should push the car left
         self.K_p_straight = self.K_p        
         self.K_d_straight = self.K_d 
         self.K_i_straight = self.K_i
         # ~ STATE_preturn ~
         self.preturn_max_thresh_dist_nrm = 7.0
-        self.preturn2_max_thresh_dist = self.preturn_max_thresh_dist_nrm + 1.75
+        self.preturn2_max_thresh_dist = self.preturn_max_thresh_dist_nrm + 2.25
         self.preturn_max_thresh_dist = self.preturn_max_thresh_dist_nrm # set to make sure its defined initially
         self.right_side_boost = 2.5 # was 2 
         self.turns_cent_setpoint = int( self.numReadings/2 ) # Center of scan with an offset, a positive addition should push the car left
         self.K_p_turn = 0.10
-	self.K_p_t2   = 0.10
+        self.K_p_t2   = 0.10
         self.preturn_speed = 0.13 # Speed for 'STATE_preturn' # 0.2 is a fast jog/run        
         self.tokyo_drift = True
         # Drifting Vars
@@ -572,44 +572,44 @@ class CarFSM:
     
     @staticmethod
     def index_of_max_half( arr ):
-	""" Choose the half of 'arr' that has the highest average , and return the overall index of the max of that half """
-	mid   = len( arr ) // 2
-	left  = arr[:mid]
-	rght  = arr[mid:]
-	if np.average( left ) > np.average( rght ):
-	    return left.index( max( left ) )
-	else:
-	    return mid + rght.index( max( rght ) )
+        """ Choose the half of 'arr' that has the highest average , and return the overall index of the max of that half """
+        mid   = len( arr ) // 2
+        left  = arr[:mid]
+        rght  = arr[mid:]
+        if np.average( left ) > np.average( rght ):
+            return left.index( max( left ) )
+        else:
+            return mid + rght.index( max( rght ) )
     
     def lock_and_seek( self , P_gain , reverse = 0 , useAlt = True ):
-	""" Find the center of the half with the highest average, and track it """
-	searchWidth = 8
-	cenDex      = self.numReadings//2
-	# 0. Load appropriate arr
-	if useAlt:
-	    trackScan = self.ocldScan
-	else:
-	    trackScan = self.lastScan
-	# 1. If we have not locked onto a target, then do so
-	if not self.targetLc:
-	    self.trackDex = CarFSM.index_of_max_half( trackScan )
-	    self.targetLc = True
-	# 2. Assuming we have target lock, search the viscinity of the last lock and update lock index
-	loDex  = max( 0                , self.trackDex - searchWidth )
-	hiDex  = min( len( trackScan ) , self.trackDex + searchWidth )
-	window = trackScan[ loDex : hiDex ]
-	self.trackDex = loDex + window.index( max( window ) )
-	# 2. Reverse if the user specifies
-	if reverse:
-	    factor = -1.0
-	else:
-	    factor =  1.0	
-	# 3. Calc error to lock location
-	translation_err = self.update_err( self.trackDex , cenDex )
-	self.currUp     = P_gain * translation_err
-	auto_steer      = self.currUp + self.currUi + self.currUd # NOTE: P-ctrl only for demo
-	# Return the total PID steer effort, reversing if 
-	return ( auto_steer * factor ) , ( translation_err < searchWidth )
+        """ Find the center of the half with the highest average, and track it """
+        searchWidth = 8
+        cenDex      = self.numReadings//2
+        # 0. Load appropriate arr
+        if useAlt:
+            trackScan = self.ocldScan
+        else:
+            trackScan = self.lastScan
+        # 1. If we have not locked onto a target, then do so
+        if not self.targetLc:
+            self.trackDex = CarFSM.index_of_max_half( trackScan )
+            self.targetLc = True
+        # 2. Assuming we have target lock, search the viscinity of the last lock and update lock index
+        loDex  = max( 0                , self.trackDex - searchWidth )
+        hiDex  = min( len( trackScan ) , self.trackDex + searchWidth )
+        window = trackScan[ loDex : hiDex ]
+        self.trackDex = loDex + window.index( max( window ) )
+        # 2. Reverse if the user specifies
+        if reverse:
+            factor = -1.0
+        else:
+            factor =  1.0    
+        # 3. Calc error to lock location
+        translation_err = self.update_err( self.trackDex , cenDex )
+        self.currUp     = P_gain * translation_err
+        auto_steer      = self.currUp + self.currUi + self.currUd # NOTE: P-ctrl only for demo
+        # Return the total PID steer effort, reversing if 
+        return ( auto_steer * factor ) , ( translation_err < searchWidth )
 
     """
     STATE_funcname
@@ -788,10 +788,10 @@ class CarFSM:
         # ~  II. Set controls  ~
         self.linearSpeed = self.recover_speed
         # self.steerAngle  = 0.00
-	if 1:
-	    self.steerAngle = self.steer_center( self.K_p_backup , reverse = 1 )
-	else:
-	    self.steerAngle , found = self.lock_and_seek( self.K_p_backup , reverse = 1 )
+        if 1:
+            self.steerAngle = self.steer_center( self.K_p_backup , reverse = 1 )
+        else:
+            self.steerAngle , found = self.lock_and_seek( self.K_p_backup , reverse = 1 )
         # ~ III. Transition Determination ~
         # A. If the min time has not passed, continue to recover
         nowTime = rospy.Time.now().to_sec()
@@ -819,9 +819,9 @@ class CarFSM:
                     self.reason      = "RECOVERY_FAILURE"        
                     self.FLAG_backup = False
         # ~  IV. Clean / Update ~        
-	if self.state != self.STATE_collide_recover:
-	    self.clear_PID()
-	    self.targetLc = False
+        if self.state != self.STATE_collide_recover:
+            self.clear_PID()
+            self.targetLc = False
         
     def STATE_seek_open( self ):
         """ Slowly drive towards the most open portion of the scan """
@@ -832,10 +832,10 @@ class CarFSM:
             self.creep_bgn_time = rospy.Time.now().to_sec()        
         # ~  II. Set controls  ~
         self.linearSpeed = self.seek_speed
-	if 0:
-	    self.steerAngle = self.steer_center( self.K_p_creep )    
-	else:
-	    self.steerAngle , found = self.lock_and_seek( self.K_p_creep )	    
+        if 0:
+            self.steerAngle = self.steer_center( self.K_p_creep )    
+        else:
+            self.steerAngle , found = self.lock_and_seek( self.K_p_creep )        
         # ~ III. Transition Determination ~
         # a. If there is an open hallway, GO
         nowTime = rospy.Time.now().to_sec()
@@ -855,7 +855,7 @@ class CarFSM:
         # If we are exiting the state, then clear the PID
         if self.state != self.STATE_seek_open:
             self.clear_PID()
-	    self.targetLc = False
+            self.targetLc = False
 
     def hallway_FSM( self ):
         """ Execute state actions and record current status """
