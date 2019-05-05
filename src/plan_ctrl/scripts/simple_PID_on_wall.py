@@ -344,13 +344,13 @@ class CarFSM:
         self.turn2_max_thresh_dist = self.max_thresh_dist_nrm + 1.0
         self.max_thresh_dist = self.max_thresh_dist_nrm # set to make sure its defined initially
         self.thresh_count    = 5 # ------------ If there are at least this many readings above 'self.max_thresh_dist'    
-        self.straights_cent_setpoint = int( self.numReadings/2 )  + 2.25  # Center of scan with an offset, a positive addition should push the car left
+        self.straights_cent_setpoint = int( self.numReadings/2 )  + 4.0  # Center of scan with an offset, a positive addition should push the car left
         self.K_p_straight = self.K_p        
         self.K_d_straight = self.K_d 
         self.K_i_straight = self.K_i
         # ~ STATE_preturn ~
-        self.preturn_max_thresh_dist_nrm = 7.0
-        self.preturn2_max_thresh_dist = self.preturn_max_thresh_dist_nrm + 2.25
+        self.preturn_max_thresh_dist_nrm = 7.3
+        self.preturn2_max_thresh_dist = self.preturn_max_thresh_dist_nrm + 2.5
         self.preturn_max_thresh_dist = self.preturn_max_thresh_dist_nrm # set to make sure its defined initially
         self.right_side_boost = 2.5 # was 2 
         self.turns_cent_setpoint = int( self.numReadings/2 ) # Center of scan with an offset, a positive addition should push the car left
@@ -360,8 +360,8 @@ class CarFSM:
         self.tokyo_drift = True
         # Drifting Vars
         self.drift_speed = 1.0 # full speed to break free tires
-        self.drift_start = 0.25 # 0.75 was this, setting to 0 to visualize when the steering angle trigger happens
-        self.drift_duration = .330 # 0.100 # milliseconds, set very high to ensure spotting the angle trigger
+        self.drift_start = 0.23 # 0.75 was this, setting to 0 to visualize when the steering angle trigger happens
+        self.drift_duration = .280 # 0.100 # milliseconds, set very high to ensure spotting the angle trigger
         self.t2_drift_duration = 0.25
         self.turn_based_drift = True
         self.drift_steer_trigger = 0.75 
@@ -669,6 +669,8 @@ class CarFSM:
         else: 
             self.max_thresh_dist = self.max_thresh_dist_nrm
 
+        if rospy.Time.now().to_sec() - self.forward_timer < 1.5:
+            self.sum_err = 0
         # ~   I. State Calcs   ~
         # 1. Calculate and store error
         input_center = self.eval_scan()
@@ -727,6 +729,8 @@ class CarFSM:
         # turn two specifics
         if self.two_turn_gains and self.turn_count >= 2:
             self.preturn_max_thresh_dist = self.preturn2_max_thresh_dist
+            if self.preturn_max_thresh_dist > self.max_thresh_dist_nrm:
+                self.max_thresh_dist = self.preturn_max_thresh_dist 
             self.dirft_duration = self.t2_drift_duration
         else:
             self.preturn_max_thresh_dist = self.preturn_max_thresh_dist_nrm
@@ -902,6 +906,7 @@ class CarFSM:
                 self.linearSpeed = 0.0
                 self.reset_time() # Reset the clock so that the car does not get stuck on resume
                 self.clear_PID()
+                self.forward_timer = rospy.Time.now().to_sec()  
                 self.drive_pub.publish(  compose_HARE_ctrl_msg( self.steerAngle , self.linearSpeed )  )
                 print('Turn count: ',self.turn_count,' this should never be more than 2!!')
             else: # only transmit control effort if not Estopped

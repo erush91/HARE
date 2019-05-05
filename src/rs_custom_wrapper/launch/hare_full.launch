@@ -26,8 +26,8 @@
     
     <!-- param name="P_VALUE" type="double" value="1.0000"/ --> <!-- 'wall_follow_state' controls on "meters" -->
     <param name="P_VALUE" type="double" value="0.027"/> <!-- 'hallway_FSM' controls on "indices" -->
-    <param name="I_VALUE" type="double" value="0.00004"/>
-    <param name="D_VALUE" type="double" value="0.035"/> 
+    <param name="I_VALUE" type="double" value="0.0001"/>
+    <param name="D_VALUE" type="double" value="0.042"/> 
 
     <!-- This should range from 0 - 1 -->
     <param name="RC_THROTTLE_SCALE" type="double" value="0.5"/> 
