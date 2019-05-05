@@ -339,8 +339,6 @@ class CarFSM:
         self.seq             =  0 # ------------ Sequence number to give ROS
         self.FLAG_goodScan   = False # --------- Was the last scan appropriate for straight-line driving
         self.reason          = "INIT" # -------- Y U change state?
-        self.occlude_dist    =  1.0  # --------- Maximum distance for which a scan reading is considered occluded
-        self.occlude_limit   = 33 # ------------ Minimum number of occluded scan readings that indicate view occlusion
         self.occlude_indices = [] # ------------ Currently occluded indices
         self.FLAG_backup     = False # --------- Flag set at the beginning of the recovery phase
         self.FLAG_creepF     = False # --------- Flag set at the beginning of the recovery phase
@@ -388,11 +386,16 @@ class CarFSM:
         self.recover_speed    = -0.15 # Back up at this speed
         self.recover_duration =  0.20 # Minimum time to recover
         self.recover_timeout  =  4.00 # Maximum time to recover
-        self.K_p_backup = 0.02
-
+        self.K_p_backup       =  0.02 # Backup Kp, should be much less than forward as the dyn's are different
+	self.occlude_dist     =  1.0  # Maximum distance for which a scan reading is considered occluded
+	self.occlude_limit    = 33 # -- Minimum number of occluded scan readings that indicate view occlusion	
         # ~ STATE_seek_open ~
-        self.seek_speed = 0.10 # Creep forward at this speed
-        self.K_p_creep = 0.3
+        self.seek_speed       =  0.10 # Creep forward at this speed
+        self.K_p_creep        =  0.3 #- Fwd Kp, should be a little more than reverse to make sure we get around the foot/box
+	self.creep_scan_dist  =  2.0 #- Distance criterion to declare an unobstructed path
+	self.creep_scan_count = 66 # -- Count criterion to declare an unobstructed path
+
+	# ~~~ CAREFUL SETTINGS : For slow challenges && Emergency Backup stable lap settings ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
         self._CAREFUL_SETTINGS = 0 # NOTE: SET TO 1 FOR { A. BOX RUN , B. STOP SIGN CHALLENGE? }
 
@@ -465,15 +468,15 @@ class CarFSM:
         # return np.mean( self.above_thresh )
         return np.mean( self.N_largest_inds )
 
-    def scan_occluded( self, offset = 0 ):
+    def scan_occluded( self , distThresh , countThresh , offset = 0 ):
         """ Return True if the last scan has more than the designated number of very-near readings """
         # NOTE: This function assumes that eval_scan has already been run
         SHOWDEBUG = 0
         # 1. Determine which scan values are above the threshold
-        self.occlude_indices = np.where( self.ocldScanNP <= self.occlude_dist + offset )[0]
+        self.occlude_indices = np.where( self.ocldScanNP <= distThresh + offset )[0]
         # 2. Predicate: Was the latest scan a good scan?
         if 1:
-            if len( self.occlude_indices ) >= self.occlude_limit:
+            if len( self.occlude_indices ) >= countThresh:
                 return True
             else:
                 return False    
@@ -722,7 +725,7 @@ class CarFSM:
             self.preturn_start_time = rospy.Time.now().to_sec()
             self.one_shot = True 
         # Z. Crash Recover Override
-        if self.scan_occluded() and self._CAREFUL_SETTINGS:
+        if self.scan_occluded( self.occlude_dist , self.occlude_limit ) and self._CAREFUL_SETTINGS:
             self.state  = self.STATE_collide_recover
             self.reason = "OCCLUSION"        
 
@@ -796,7 +799,7 @@ class CarFSM:
             self.reason = "UNDER_THRESH"
 
         # Z. Crash Recover Override
-        if self.scan_occluded() and self._CAREFUL_SETTINGS:
+        if self.scan_occluded( self.occlude_dist , self.occlude_limit ) and self._CAREFUL_SETTINGS:
             self.state  = self.STATE_collide_recover
             self.reason = "OCCLUSION"                
 
@@ -825,7 +828,7 @@ class CarFSM:
         # B. Else the minimum time has passed
         else:
             # i. If the occlusion has been cleared, then seek open space
-            if not self.scan_occluded(0.5):
+            if not self.scan_occluded( self.occlude_dist , self.occlude_limit , 0.5):
                 self.FLAG_backup = False
                 self.eval_scan()
                 # a. If there is an open hallway, GO
@@ -861,16 +864,20 @@ class CarFSM:
 	else:
 	    self.steerAngle , found = self.lock_and_seek( self.K_p_creep )	    
         # ~ III. Transition Determination ~
-        # a. If there is an open hallway, GO
+        
         nowTime = rospy.Time.now().to_sec()
+	# a. If the min backup time not expired
         if nowTime - self.creep_bgn_time <= self.creep_timeout:
             self.state  = self.STATE_seek_open
-            self.reason = "UNDER_MIN_TIME"             
+            self.reason = "UNDER_MIN_TIME"     
+	# b. Else min backup time expired, time to check for a clear path
         else:
-            if self.FLAG_goodScan:
+	    # c. If there is an open hallway, GO
+            #if self.FLAG_goodScan:
+	    if not self.scan_occluded( self.creep_scan_dist , self.creep_scan_count ):
                 self.state  = self.STATE_forward
-                self.reason = "OVER_THRESH"
-            # b. Else creep forward
+                self.reason = "OCCLUDE_SCAN_CLEAR"
+            # d. Else creep forward
             else:
                 self.state  = self.STATE_seek_open
                 self.reason = "UNDER_THRESH" 
