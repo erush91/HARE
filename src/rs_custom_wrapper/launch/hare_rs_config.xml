@@ -25,16 +25,16 @@
         <param name="DEPTH_METERS_FLAG" type="boolean" value="1"/>
     </node>
 
-    <node pkg="rs_custom_wrapper" type="color_rs_wrapper" name="color_rs_wrapper" output="screen">
-        <!-- DISPLAY THE CV IM SHOW VISUALIZER -->
+    <!--<node pkg="rs_custom_wrapper" type="color_rs_wrapper" name="color_rs_wrapper" output="screen">
+        DISPLAY THE CV IM SHOW VISUALIZER
 	    <param name="IMSHOW_COLOR" type="boolean" value="0"/>
 
-        <!-- COMPUTE & PRINT COLOR MATRIX -->
+        COMPUTE & PRINT COLOR MATRIX 
         <param name="COLOR_FLAG" type="boolean" value="1"/>
         
-        <!-- DEPTH IMAGE PARAMETERS -->
+        DEPTH IMAGE PARAMETERS 
         <param name="COLOR_WIDTH" type="int" value="640"/>
         <param name="COLOR_HEIGHT" type="int" value="360"/>
         <param name="COLOR_FPS" type="int" value="30"/>
-    </node>
+    </node>-->
 </launch>

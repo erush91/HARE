@@ -181,7 +181,7 @@ class CarFSM:
         rospy.Subscriber( "/alternat_distance" , Float32MultiArray , self.ocld_cb )
 
         # Init Flags
-        self.useStopDetect = True
+        self.useStopDetect = False
         if self.useStopDetect:
             rospy.Subscriber( "/stop_sign" , Bool , self.stop_cb )
         
@@ -391,15 +391,15 @@ class CarFSM:
         self.counter_steer_duration = 0.200
         # ~ STATE_collide_recover ~
         self.recover_speed    = -0.15 # Back up at this speed
-        self.recover_duration =  0.25 # Minimum time to recover
+        self.recover_duration =  1.00 # Minimum time to recover
         self.recover_timeout  =  5.00 # Maximum time to recover
         self.K_p_backup       =  0.03 # Backup Kp, should be much less than forward as the dyn's are different
-        self.occlude_dist     =  1.0  # Maximum distance for which a scan reading is considered occluded
+        self.occlude_dist     =  0.75  # Maximum distance for which a scan reading is considered occluded
         self.occlude_limit    = 30 # -- Minimum number of occluded scan readings that indicate view occlusion    
         # ~ STATE_seek_open ~
         self.seek_speed       =  0.10 # Creep forward at this speed
-        self.K_p_creep        =  0.6 #- Fwd Kp, should be a little more than reverse to make sure we get around the foot/box
-        self.creep_scan_dist  =  2.0 #- Distance criterion to declare an unobstructed path
+        self.K_p_creep        =  0.06 #- Fwd Kp, should be a little more than reverse to make sure we get around the foot/box
+        self.creep_scan_dist  =  1.5 #- Distance criterion to declare an unobstructed path
         self.creep_scan_count = 20 # -- Count criterion to declare an unobstructed path
 
         # ~~~ CAREFUL SETTINGS : For slow challenges && Emergency Backup stable lap settings ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -411,7 +411,7 @@ class CarFSM:
             # ~~ State-Specific Constants ~~
             self.two_turn_gains = False
             # ~ STATE_forward ~
-            self.straight_speed  = 0.12 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
+            self.straight_speed  = 0.13 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
             self.max_thresh_dist = 9.0 # ---------- Above this value we consider distance to be maxed out [m]
             self.thresh_count    = 5 # ------------ If there are at least this many readings above 'self.max_thresh_dist'    
             self.straights_cent_setpoint = int( self.numReadings/2 ) # + 5  # Center of scan with an offset, a positive addition should push the car left
@@ -427,7 +427,7 @@ class CarFSM:
             self.tokyo_drift = False
             # ~ STATE_collide_recover ~
             self.recover_speed    = -0.15 # Back up at this speed
-            self.recover_duration =  0.20 # Minimum time to recover
+            self.recover_duration =  0.50 # Minimum time to recover
             self.recover_timeout  =  3.00 # Maximum time to recover
             self.K_p_backup = 0.01
             # ~ STATE_seek_open ~
@@ -611,14 +611,17 @@ class CarFSM:
         half  = mid // 2
         left  = arr[ : mid ]
         rght  = arr[ mid : ]
-        if np.average( left ) > np.average( rght ):
-            return left.index( max( left ) )
-        else:
-            return mid + rght.index( max( rght ) )
+
+        return mid + rght.index( max( rght ) )
+
+        #if np.average( left ) > np.average( rght ):
+        #    return left.index( max( left ) )
+        #else:
+        #    return mid + rght.index( max( rght ) )
     
     def lock_and_seek( self , P_gain , reverse = 0 , useAlt = True ):
         """ Find the center of the half with the highest average, and track it """
-        searchWidth = 8
+        searchWidth = 2
         cenDex      = self.numReadings//2
         # 0. Load appropriate arr
         if useAlt:
@@ -627,8 +630,12 @@ class CarFSM:
             trackScan = self.lastScan
         # 1. If we have not locked onto a target, then do so
         offset = 30
+        isLeftLock = False
         if not self.targetLc:
             self.trackDex = CarFSM.index_of_max_half( trackScan )
+            self.targetLc = True
+            if self.trackDex < 50:
+                isLeftLock = True
 #            if self.trackDex < 50:
  #              self.trackDex += offset
   #          else:
@@ -645,11 +652,13 @@ class CarFSM:
         else:
             factor =  1.0    
         # 3. Calc error to lock location
-        if self.trackDex < 50:
-            self.trackDex -= 25
+        offset = 5
+        if isLeftLock:
+            tempDex = max( 0 , self.trackDex - offset )
+            
         else:
-            self.trackDex += 25
-        translation_err = self.update_err( self.trackDex , cenDex )
+            tempDex = min( 100 , self.trackDex + offset )
+        translation_err = self.update_err( tempDex , cenDex )
         self.currUp     = P_gain * translation_err
         auto_steer      = self.currUp + self.currUi + self.currUd # NOTE: P-ctrl only for demo
         # Return the total PID steer effort, reversing if 
@@ -847,8 +856,10 @@ class CarFSM:
         # self.steerAngle  = 0.00
         if 0:
             self.steerAngle = self.steer_center( self.K_p_backup , reverse = 1 )
-        else:
+        elif 0:
             self.steerAngle , found = self.lock_and_seek( self.K_p_backup , reverse = 1 )
+        else:
+            self.steerAngle = 0.0
         # ~ III. Transition Determination ~
         # A. If the min time has not passed, continue to recover
         nowTime = rospy.Time.now().to_sec()
@@ -993,12 +1004,13 @@ class CarFSM:
 
             # 1. Calculate a control effort
             #self.FLAG_newCtrl = True # HACKKKKKKKKKKKKKKKKKKKKKKKKKK
-            if 1: # Enable Finite State Machine
+            if 0: # Enable Finite State Machine
                 self.hallway_FSM()
                 self.dampen_micro_cmds()
                 
             else: # Enable test - Unchanging open loop command
                 self.test_state()
+                self.FLAG_newCtrl   = True
 
             if self.FLAG_estop:
                 rospy.loginfo_throttle( 1 , "ESTOP ENGAGED" )
@@ -1030,9 +1042,10 @@ class CarFSM:
         # 1. Set the steering angle
         self.t_curr += self.t_incr
         self.steerAngle = pi/4 * sin( self.t_curr )
+        print "Test Steering:" , self.steerAngle
         # 2. Set the throttle
         if 1:
-            self.linearSpeed = 0.1
+            self.linearSpeed = 0.0
         else:
             self.t_curr = rospy.Time.now().to_sec()
             # A. If more than 1 second has passed since the last transition, advance to the next speed state

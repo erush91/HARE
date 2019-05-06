@@ -39,6 +39,6 @@
           args="record -o /rosout /HARE_high_level_command /filtered_distance /pololu/command /pololu/motor_states"/ --> 
 
     <!-- Start Sign Detection --> 
-    <include file="$(find image_proc)/launch/stopsign.launch" />
+    <!-- <include file="$(find image_proc)/launch/stopsign.launch" /> -->
     
 </launch>
