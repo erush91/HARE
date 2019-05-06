@@ -391,16 +391,16 @@ class CarFSM:
         self.counter_steer_duration = 0.200
         # ~ STATE_collide_recover ~
         self.recover_speed    = -0.15 # Back up at this speed
-        self.recover_duration =  0.20 # Minimum time to recover
-        self.recover_timeout  =  4.00 # Maximum time to recover
-        self.K_p_backup       =  0.02 # Backup Kp, should be much less than forward as the dyn's are different
+        self.recover_duration =  0.25 # Minimum time to recover
+        self.recover_timeout  =  5.00 # Maximum time to recover
+        self.K_p_backup       =  0.03 # Backup Kp, should be much less than forward as the dyn's are different
         self.occlude_dist     =  1.0  # Maximum distance for which a scan reading is considered occluded
-        self.occlude_limit    = 33 # -- Minimum number of occluded scan readings that indicate view occlusion    
+        self.occlude_limit    = 30 # -- Minimum number of occluded scan readings that indicate view occlusion    
         # ~ STATE_seek_open ~
         self.seek_speed       =  0.10 # Creep forward at this speed
-        self.K_p_creep        =  0.3 #- Fwd Kp, should be a little more than reverse to make sure we get around the foot/box
+        self.K_p_creep        =  0.6 #- Fwd Kp, should be a little more than reverse to make sure we get around the foot/box
         self.creep_scan_dist  =  2.0 #- Distance criterion to declare an unobstructed path
-        self.creep_scan_count = 66 # -- Count criterion to declare an unobstructed path
+        self.creep_scan_count = 20 # -- Count criterion to declare an unobstructed path
 
         # ~~~ CAREFUL SETTINGS : For slow challenges && Emergency Backup stable lap settings ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -427,17 +427,17 @@ class CarFSM:
             self.tokyo_drift = False
             # ~ STATE_collide_recover ~
             self.recover_speed    = -0.15 # Back up at this speed
-            self.recover_duration =  0.10 # Minimum time to recover
+            self.recover_duration =  0.20 # Minimum time to recover
             self.recover_timeout  =  3.00 # Maximum time to recover
             self.K_p_backup = 0.01
             # ~ STATE_seek_open ~
             self.seek_speed    = 0.10 # Creep forward at this speed
-            self.K_p_creep     = 0.05 # Proportional gain for obstacle avoidance
+            self.K_p_creep     = 0.025 # Proportional gain for obstacle avoidance
             self.creep_timeout = 3.00 # Maximum time to recover
             # STATE_stop_for_sign
             self.stopped_begin_time   =  0.0
             self.cached_state         = self.STATE_init
-            self.stopsign_delay       =  0.60
+            self.stopsign_delay       =  0.00
             self.stopsign_duration    =  8.0    
             self.stop_suppress_duratn = 20.0
 
@@ -609,12 +609,12 @@ class CarFSM:
         """ Choose the half of 'arr' that has the highest average , and return the overall index of the max of that half """
         mid   = len( arr ) // 2
         half  = mid // 2
-        left  = arr[ : mid-half ]
-        rght  = arr[ mid+half : ]
+        left  = arr[ : mid ]
+        rght  = arr[ mid : ]
         if np.average( left ) > np.average( rght ):
             return left.index( max( left ) )
         else:
-            return mid + half + rght.index( max( rght ) )
+            return mid + rght.index( max( rght ) )
     
     def lock_and_seek( self , P_gain , reverse = 0 , useAlt = True ):
         """ Find the center of the half with the highest average, and track it """
@@ -626,9 +626,14 @@ class CarFSM:
         else:
             trackScan = self.lastScan
         # 1. If we have not locked onto a target, then do so
+        offset = 30
         if not self.targetLc:
             self.trackDex = CarFSM.index_of_max_half( trackScan )
-            self.targetLc = True
+#            if self.trackDex < 50:
+ #              self.trackDex += offset
+  #          else:
+   #            self.trackDex -= offset
+    #        self.targetLc = True
         # 2. Assuming we have target lock, search the viscinity of the last lock and update lock index
         loDex  = max( 0                , self.trackDex - searchWidth )
         hiDex  = min( len( trackScan ) , self.trackDex + searchWidth )
@@ -640,6 +645,10 @@ class CarFSM:
         else:
             factor =  1.0    
         # 3. Calc error to lock location
+        if self.trackDex < 50:
+            self.trackDex -= 25
+        else:
+            self.trackDex += 25
         translation_err = self.update_err( self.trackDex , cenDex )
         self.currUp     = P_gain * translation_err
         auto_steer      = self.currUp + self.currUi + self.currUd # NOTE: P-ctrl only for demo
@@ -831,11 +840,12 @@ class CarFSM:
         if not self.FLAG_backup:
             self.FLAG_backup    = True
             self.rcovr_bgn_time = rospy.Time.now().to_sec()
-        
+        # self.occlude_limit += 5
+        # print "Occlude Limit:" , self.occlude_limit , ".. ADJUSTED!"
         # ~  II. Set controls  ~
         self.linearSpeed = self.recover_speed
         # self.steerAngle  = 0.00
-        if 1:
+        if 0:
             self.steerAngle = self.steer_center( self.K_p_backup , reverse = 1 )
         else:
             self.steerAngle , found = self.lock_and_seek( self.K_p_backup , reverse = 1 )
@@ -894,6 +904,10 @@ class CarFSM:
         else:
         # c. If there is an open hallway, GO
             #if self.FLAG_goodScan:
+#            if not self.scan_occluded( self.occlude_dist , self.occlude_limit ):
+ #               self.state = self.STATE_collide_recover
+  #              self.reason = "RE_COLLIDE"
+   #             self.occlude_limit += 5
             if not self.scan_occluded( self.creep_scan_dist , self.creep_scan_count ):
                 self.state  = self.STATE_forward
                 self.reason = "OCCLUDE_SCAN_CLEAR"

@@ -184,7 +184,7 @@ void StopSignNodelet::imageCb(const sensor_msgs::ImageConstPtr& image_msg)
 
   // Filter by Area.
   params.filterByArea = true;
-  params.minArea = 2500;
+  params.minArea = 1500;
   params.maxArea = 153600;
 
   // Filter by Circularity
