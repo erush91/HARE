@@ -223,9 +223,9 @@ class CarFSM:
         self.prevLinarSpeed = 0.0
         self.angleDiffMin   = rospy.get_param( "ANGLE_DIFF_MIN" ) # limits micro commands
         self.linearSpeed    = rospy.get_param( "LINEAR_SPEED"   ) # [ -1 ,  1 ]    
-	# ~ Tracking Memory ~
-	self.trackDex = 0
-	self.targetLc = False	
+        # ~ Tracking Memory ~
+        self.trackDex = 0
+        self.targetLc = False    
 
         # 8. Test vars
         self.t_test = 0.0
@@ -242,10 +242,10 @@ class CarFSM:
         self.rc_throttle_mid = 1500
         self.rc_throttle_min = 1000
         # Steering
-        self.rc_steering     =    0.0
-        self.rc_steering_max = 2000
+        self.rc_steering     =  0.0
+        self.rc_steering_max = 2003
         self.rc_steering_mid = 1500
-        self.rc_steering_min = 1000
+        self.rc_steering_min = 1010
         # Flags
         self.FLAG_estop   = False
         self.FLAG_rc_ovrd = False
@@ -353,29 +353,33 @@ class CarFSM:
         self.turn_count_db_dur = 2.0 
         # ~ STATE_forward ~
         self.forward_timer = rospy.Time.now().to_sec()
-        self.straight_speed  = 0.28 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
+        self.dragOn = 0
+        self.drag_speed = 0.5 
+        self.drag_duration = 2.0 # seconds 
+        self.straight_speed  = 0.32 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
         self.max_thresh_dist_nrm = 9.0 # ---------- Above this value we consider distance to be maxed out [m]  # TODO: Try 8 for tighter turns
         self.turn2_max_thresh_dist = self.max_thresh_dist_nrm + 1.0
         self.max_thresh_dist = self.max_thresh_dist_nrm # set to make sure its defined initially
         self.thresh_count    = 5 # ------------ If there are at least this many readings above 'self.max_thresh_dist'    
-        self.straights_cent_setpoint = int( self.numReadings/2 )  + 1.0  # Center of scan with an offset, a positive addition should push the car left
+        self.straights_cent_setpoint = int( self.numReadings/2 )  + 4.0  # Center of scan with an offset, a positive addition should push the car left
         self.K_p_straight = self.K_p        
         self.K_d_straight = self.K_d 
         self.K_i_straight = self.K_i
         # ~ STATE_preturn ~
-        self.preturn_max_thresh_dist_nrm = 6.5
-        self.preturn2_max_thresh_dist = self.preturn_max_thresh_dist_nrm + 1.5
+        self.preturn_max_thresh_dist_nrm = 8.25
+        self.preturn2_max_thresh_dist = self.preturn_max_thresh_dist_nrm + 3.20
         self.preturn_max_thresh_dist = self.preturn_max_thresh_dist_nrm # set to make sure its defined initially
-        self.right_side_boost = 2.0 # was 2 
+        self.right_side_boost = 2.5 # was 2 
         self.turns_cent_setpoint = int( self.numReadings/2 ) # Center of scan with an offset, a positive addition should push the car left
         self.K_p_turn = 0.10
+        self.K_p_t2   = 0.10
         self.preturn_speed = 0.13 # Speed for 'STATE_preturn' # 0.2 is a fast jog/run        
         self.tokyo_drift = True
         # Drifting Vars
         self.drift_speed = 1.0 # full speed to break free tires
-        self.drift_start = 0.25 # 0.75 was this, setting to 0 to visualize when the steering angle trigger happens
-        self.drift_duration = .330 # 0.100 # milliseconds, set very high to ensure spotting the angle trigger
-        self.t2_drift_duration = 0.25
+        self.drift_start = 0.33 + 0.10 # 0.75 was this, setting to 0 to visualize when the steering angle trigger happens
+        self.drift_duration = 0.280 + 0.02 # 0.100 # milliseconds, set very high to ensure spotting the angle trigger
+        self.t2_drift_duration = 0.280 + 0.02
         self.turn_based_drift = True
         self.drift_steer_trigger = 0.75 
         self.enable_counter_steer = True
@@ -598,45 +602,45 @@ class CarFSM:
     
     @staticmethod
     def index_of_max_half( arr ):
-	""" Choose the half of 'arr' that has the highest average , and return the overall index of the max of that half """
-	mid   = len( arr ) // 2
-	half  = mid // 2
-	left  = arr[ : mid-half ]
-	rght  = arr[ mid+half : ]
-	if np.average( left ) > np.average( rght ):
-	    return left.index( max( left ) )
-	else:
-	    return mid + half + rght.index( max( rght ) )
+        """ Choose the half of 'arr' that has the highest average , and return the overall index of the max of that half """
+        mid   = len( arr ) // 2
+        half  = mid // 2
+        left  = arr[ : mid-half ]
+        rght  = arr[ mid+half : ]
+        if np.average( left ) > np.average( rght ):
+            return left.index( max( left ) )
+        else:
+            return mid + half + rght.index( max( rght ) )
     
     def lock_and_seek( self , P_gain , reverse = 0 , useAlt = True ):
-	""" Find the center of the half with the highest average, and track it """
-	searchWidth = 8
-	cenDex      = self.numReadings//2
-	# 0. Load appropriate arr
-	if useAlt:
-	    trackScan = self.ocldScan
-	else:
-	    trackScan = self.lastScan
-	# 1. If we have not locked onto a target, then do so
-	if not self.targetLc:
-	    self.trackDex = CarFSM.index_of_max_half( trackScan )
-	    self.targetLc = True
-	# 2. Assuming we have target lock, search the viscinity of the last lock and update lock index
-	loDex  = max( 0                , self.trackDex - searchWidth )
-	hiDex  = min( len( trackScan ) , self.trackDex + searchWidth )
-	window = trackScan[ loDex : hiDex ]
-	self.trackDex = loDex + window.index( max( window ) )
-	# 2. Reverse if the user specifies
-	if reverse:
-	    factor = -1.0
-	else:
-	    factor =  1.0	
-	# 3. Calc error to lock location
-	translation_err = self.update_err( self.trackDex , cenDex )
-	self.currUp     = P_gain * translation_err
-	auto_steer      = self.currUp + self.currUi + self.currUd # NOTE: P-ctrl only for demo
-	# Return the total PID steer effort, reversing if 
-	return ( auto_steer * factor ) , ( translation_err < searchWidth )
+        """ Find the center of the half with the highest average, and track it """
+        searchWidth = 8
+        cenDex      = self.numReadings//2
+        # 0. Load appropriate arr
+        if useAlt:
+            trackScan = self.ocldScan
+        else:
+            trackScan = self.lastScan
+        # 1. If we have not locked onto a target, then do so
+        if not self.targetLc:
+            self.trackDex = CarFSM.index_of_max_half( trackScan )
+            self.targetLc = True
+        # 2. Assuming we have target lock, search the viscinity of the last lock and update lock index
+        loDex  = max( 0                , self.trackDex - searchWidth )
+        hiDex  = min( len( trackScan ) , self.trackDex + searchWidth )
+        window = trackScan[ loDex : hiDex ]
+        self.trackDex = loDex + window.index( max( window ) )
+        # 2. Reverse if the user specifies
+        if reverse:
+            factor = -1.0
+        else:
+            factor =  1.0    
+        # 3. Calc error to lock location
+        translation_err = self.update_err( self.trackDex , cenDex )
+        self.currUp     = P_gain * translation_err
+        auto_steer      = self.currUp + self.currUi + self.currUd # NOTE: P-ctrl only for demo
+        # Return the total PID steer effort, reversing if 
+        return ( auto_steer * factor ) , ( translation_err < searchWidth )
 
     """
     STATE_funcname
@@ -696,6 +700,16 @@ class CarFSM:
         else: 
             self.max_thresh_dist = self.max_thresh_dist_nrm
 
+        if rospy.Time.now().to_sec() - self.forward_timer < 1.5:
+            self.sum_err = 0
+
+        if self.dragOn:
+            if self.turn_count < 2 and (rospy.Time.now().to_sec() - self.forward_timer) < self.drag_duration:
+                self.linearSpeed = self.drag_speed  
+            else: 
+                self.linearSpeed = self.straight_speed
+
+
         # ~   I. State Calcs   ~
         # 1. Calculate and store error
         input_center = self.eval_scan()
@@ -754,6 +768,8 @@ class CarFSM:
         # turn two specifics
         if self.two_turn_gains and self.turn_count >= 2:
             self.preturn_max_thresh_dist = self.preturn2_max_thresh_dist
+            if self.preturn_max_thresh_dist > self.max_thresh_dist_nrm:
+                self.max_thresh_dist = self.preturn_max_thresh_dist 
             self.dirft_duration = self.t2_drift_duration
         else:
             self.preturn_max_thresh_dist = self.preturn_max_thresh_dist_nrm
@@ -815,10 +831,10 @@ class CarFSM:
         # ~  II. Set controls  ~
         self.linearSpeed = self.recover_speed
         # self.steerAngle  = 0.00
-	if 1:
-	    self.steerAngle = self.steer_center( self.K_p_backup , reverse = 1 )
-	else:
-	    self.steerAngle , found = self.lock_and_seek( self.K_p_backup , reverse = 1 )
+        if 1:
+            self.steerAngle = self.steer_center( self.K_p_backup , reverse = 1 )
+        else:
+            self.steerAngle , found = self.lock_and_seek( self.K_p_backup , reverse = 1 )
         # ~ III. Transition Determination ~
         # A. If the min time has not passed, continue to recover
         nowTime = rospy.Time.now().to_sec()
@@ -846,9 +862,9 @@ class CarFSM:
                     self.reason      = "RECOVERY_FAILURE"        
                     self.FLAG_backup = False
         # ~  IV. Clean / Update ~        
-	if self.state != self.STATE_collide_recover:
-	    self.clear_PID()
-	    self.targetLc = False
+        if self.state != self.STATE_collide_recover:
+            self.clear_PID()
+            self.targetLc = False
         
     def STATE_seek_open( self ):
         """ Slowly drive towards the most open portion of the scan """
@@ -859,22 +875,22 @@ class CarFSM:
             self.creep_bgn_time = rospy.Time.now().to_sec()        
         # ~  II. Set controls  ~
         self.linearSpeed = self.seek_speed
-	if 0:
-	    self.steerAngle = self.steer_center( self.K_p_creep )    
-	else:
-	    self.steerAngle , found = self.lock_and_seek( self.K_p_creep )	    
+        if 0:
+            self.steerAngle = self.steer_center( self.K_p_creep )    
+        else:
+            self.steerAngle , found = self.lock_and_seek( self.K_p_creep )        
         # ~ III. Transition Determination ~
         
         nowTime = rospy.Time.now().to_sec()
-	# a. If the min backup time not expired
+        # a. If the min backup time not expired
         if nowTime - self.creep_bgn_time <= self.creep_timeout:
             self.state  = self.STATE_seek_open
             self.reason = "UNDER_MIN_TIME"     
-	# b. Else min backup time expired, time to check for a clear path
+        # b. Else min backup time expired, time to check for a clear path
         else:
-	    # c. If there is an open hallway, GO
+        # c. If there is an open hallway, GO
             #if self.FLAG_goodScan:
-	    if not self.scan_occluded( self.creep_scan_dist , self.creep_scan_count ):
+            if not self.scan_occluded( self.creep_scan_dist , self.creep_scan_count ):
                 self.state  = self.STATE_forward
                 self.reason = "OCCLUDE_SCAN_CLEAR"
             # d. Else creep forward
@@ -886,33 +902,33 @@ class CarFSM:
         # If we are exiting the state, then clear the PID
         if self.state != self.STATE_seek_open:
             self.clear_PID()
-	    self.targetLc = False
+            self.targetLc = False
 
     def STATE_stop_for_sign( self ):
-	""" Idle at the stopsign for X seconds then resume at the saved state """
-	# ~   I. State Calcs   ~
-	# 1. If we just entered the state, set flag
-	if not self.FLAG_stopped_at_sign:
-	    self.FLAG_stopped_at_sign = True
-	    self.stopped_begin_time   = rospy.Time.now().to_sec()
-	    self.cached_state         = self.prevState	
-	# ~  II. Set controls  ~
-	self.linearSpeed = 0.0 # Obviously
-	# ~ III. Transition Determination ~
-	# 3. If the minimum dwell time has not elapsed, remain in this state
-	if rospy.Time.now().to_sec() - self.stopped_begin_time <= self.stopsign_duration:
-	    self.state  = self.STATE_stop_for_sign
-	    self.reason = "UNDER_DWELL_TIME"
-	# 4. Else restored the cached state
-	else:
-	    self.state                = self.cached_state # -- Restore prev state
-	    self.reason               = "RESTORE_AFTER_STOP" # We done stopping
-	    self.FLAG_stopped_at_sign = False # -------------- We done stopping
-	    self.suppress_stop        = True # --------------- Do not stop twice
-	    self.cached_state         = self.STATE_init # ---- Until it is overwritten
+        """ Idle at the stopsign for X seconds then resume at the saved state """
+        # ~   I. State Calcs   ~
+        # 1. If we just entered the state, set flag
+        if not self.FLAG_stopped_at_sign:
+            self.FLAG_stopped_at_sign = True
+            self.stopped_begin_time   = rospy.Time.now().to_sec()
+            self.cached_state         = self.prevState	
+        # ~  II. Set controls  ~
+        self.linearSpeed = 0.0 # Obviously
+        # ~ III. Transition Determination ~
+        # 3. If the minimum dwell time has not elapsed, remain in this state
+        if rospy.Time.now().to_sec() - self.stopped_begin_time <= self.stopsign_duration:
+            self.state  = self.STATE_stop_for_sign
+            self.reason = "UNDER_DWELL_TIME"
+        # 4. Else restored the cached state
+        else:
+            self.state                = self.cached_state # -- Restore prev state
+            self.reason               = "RESTORE_AFTER_STOP" # We done stopping
+            self.FLAG_stopped_at_sign = False # -------------- We done stopping
+            self.suppress_stop        = True # --------------- Do not stop twice
+            self.cached_state         = self.STATE_init # ---- Until it is overwritten
 	
-	# ~  IV. Clean / Update ~	
-	self.reset_time() # Do not allow a stop to stall controls
+        # ~  IV. Clean / Update ~	
+        self.reset_time() # Do not allow a stop to stall controls
 	    
     def hallway_FSM( self ):
         """ Execute state actions and record current status """
@@ -963,6 +979,7 @@ class CarFSM:
                 self.linearSpeed = 0.0
                 self.reset_time() # Reset the clock so that the car does not get stuck on resume
                 self.clear_PID()
+                self.forward_timer = rospy.Time.now().to_sec()  
                 self.drive_pub.publish(  compose_HARE_ctrl_msg( self.steerAngle , self.linearSpeed )  )
                 print('Turn count: ',self.turn_count,' this should never be more than 2!!')
             else: # only transmit control effort if not Estopped

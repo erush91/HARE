@@ -16,13 +16,13 @@ drive_motor:
 steering_servo:
     pololu_id: 1
     motor_id: 15
-    init: 1325
-    min: 1110
-    max: 1640
+    init: 1500
+    min: 1150
+    max: 1850
     reverse: false
     calibration:
-      min_pulse: 1325
+      min_pulse: 1150
       min_angle: 0
-      max_pulse: 1640 
+      max_pulse: 1850 
       max_angle: 90
 

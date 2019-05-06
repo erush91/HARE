@@ -1,0 +1,19 @@
+<launch>
+
+	<node pkg="nodelet" type="nodelet" name="stopsign_manager" args="manager" output="screen"/>
+
+	<arg name="manager"             default="stopsign_manager"/>
+	<arg name="bond"                            default="false" />
+ 	<arg name="respawn"                         default="$(arg bond)" />
+
+      	<node pkg="nodelet" type="nodelet" output="screen"
+        args="load image_proc/stopsign $(arg manager) $(arg bond)" respawn="$(arg respawn)"
+        name="stop_sign"
+	>
+        <remap from="camera/image_raw" to="camera/color/image_rect_raw"/>
+        <remap from="camera/image_info" to="color/camera_info"/>
+        <remap from="camera_out/h_scans" to="color/h_scans"/>
+        <remap from="camera_out/h_scan" to="color/h_scan"/>
+	</node>
+</launch>
+

@@ -13,10 +13,10 @@ def cmd_cb( msg ):
     #globals steering_cmd_msg , motor_cmd_msg
 
     # Limit incoming message to steering limits
-    if msg.steering_angle > .78:
-        msg.steering_angle = .78
-    elif msg.steering_angle < -.78:
-        msg.steering_angle = -.78
+    if msg.steering_angle > .765:
+        msg.steering_angle = .765
+    elif msg.steering_angle < -.765:
+        msg.steering_angle = -.765
 
     steering_cmd_msg.position = msg.steering_angle
 
