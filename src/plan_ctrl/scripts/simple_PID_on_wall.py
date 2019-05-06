@@ -664,6 +664,56 @@ class CarFSM:
         # Return the total PID steer effort, reversing if 
         return ( auto_steer * factor ) , ( translation_err < searchWidth )
 
+    def seek_largest_opening( self , threshDist , P_gain , reverse = 0 , useAlt = True ):
+        """ Look for the largest free space and drive for it , RATIONALE: Avoid trying to preserve a target lock between iterations """
+        # WHY: 1. Max is noisy , 2. Actual target may be moving outside of our lock window which voids our assumption
+        # 0. Load appropriate arr
+        if useAlt:
+            trackScan = self.ocldScan
+        else:
+            trackScan = self.lastScan        
+        # 1. Separate the scan into near and far blocks , Find the longest far block, and return it's center
+        bestLen  = 0
+        bestCnt  = 0.0
+        currLen  = 0
+        bgnBlock = 0
+        endBlock = 0
+        blockOn  = 0
+        for i , reading in enumerate( trackScan ):
+            if reading > threshDist:
+                if not blockOn:
+                    blockOn  = 1
+                    bgnBlock = i
+                    currLen  = 1
+                else:
+                    currLen += 1
+            else:
+                if blockOn:
+                    blockOn  = 0
+                    endBlock = i - 1
+                    if currLen > bestLen:
+                        bestCnt = ( bgnBlock + endBlock ) / 2.0
+                currLen = 0
+                blockOn = 0
+        else:
+            if blockOn:
+                endBlock = len( trackScan ) - 1
+                if currLen > bestLen:
+                    bestCnt = ( bgnBlock + endBlock ) / 2.0
+        # 2. Reverse if the user specifies
+        if reverse:
+            factor = -1.0
+        else:
+            factor =  1.0     
+        # 3. Calc control effort
+        cenDex          = self.numReadings//2
+        translation_err = self.update_err( bestCnt , cenDex )
+        self.currUp     = P_gain * translation_err
+        auto_steer      = self.currUp # + self.currUi + self.currUd # NOTE: P-ctrl only for demo
+        # Return the total PID steer effort, reversing if 
+        return auto_steer * factor       
+                
+
     """
     STATE_funcname
     # ~   I. State Calcs   ~
@@ -902,8 +952,11 @@ class CarFSM:
         self.linearSpeed = self.seek_speed
         if 0:
             self.steerAngle = self.steer_center( self.K_p_creep )    
-        else:
+        elif 1:
             self.steerAngle , found = self.lock_and_seek( self.K_p_creep )        
+        else:
+            threshDist = 2.0
+            self.steerAngle = self.seek_largest_opening( threshDist , self.K_p_creep )
         # ~ III. Transition Determination ~
         
         nowTime = rospy.Time.now().to_sec()

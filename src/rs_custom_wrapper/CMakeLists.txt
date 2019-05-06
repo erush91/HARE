@@ -6,7 +6,7 @@ set(CMAKE_BUILD_TYPE Release)
 message("CMAKE_C_FLAGS_RELEASE is ${CMAKE_C_FLAGS_RELEASE}")
 
 find_package(
-  OpenCV 3.4.1 EXACT REQUIRED
+  OpenCV 3.4.2 EXACT REQUIRED
 )
 
 # locate OpenCV in system
