@@ -36,6 +36,9 @@
     <node name="CarFSM" pkg="plan_ctrl" type="simple_PID_on_wall.py" output="screen" />
     <!-- Start Recording , URL: https://answers.ros.org/question/52773/record-with-rosbag-from-launch-file/?answer=52856#post-id-52856 -->
     <!-- node pkg="rosbag" type="record" name="rosbag_record_hall"
-          args="record -o /rosout /HARE_high_level_command /filtered_distance /pololu/command /pololu/motor_states"/ -->  
+          args="record -o /rosout /HARE_high_level_command /filtered_distance /pololu/command /pololu/motor_states"/ --> 
+
+    <!-- Start Sign Detection --> 
+    <include file="$(find image_proc)/launch/stopsign.launch" />
     
 </launch>

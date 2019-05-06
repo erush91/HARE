@@ -178,10 +178,12 @@ class CarFSM:
         # 3. Start subscribers and listeners
         rospy.Subscriber( "/filtered_distance" , Float32MultiArray , self.scan_cb )
         rospy.Subscriber( "/alternat_distance" , Float32MultiArray , self.ocld_cb )
-	
-	self.useStopDetect = False
-	if self.useStopDetect:
-	    rospy.Subscriber( "/stop_sign" , Bool , self.stop_cb )
+
+        # Init Flags
+        self.useStopDetect = True
+    
+        if self.useStopDetect:
+            rospy.Subscriber( "/stop_sign" , Bool , self.stop_cb )
 
         # 3.5. Init scan math
         # 3.5.1. Driving Scan 
@@ -250,10 +252,10 @@ class CarFSM:
         self.FLAG_estop   = False
         self.FLAG_rc_ovrd = False
         rospy.Subscriber( "/rc_raw", RCRaw, self.rc_cb )
-        self.rc_msg = RCRaw()	
-	self.stopSgnDetected      = False
-	self.suppress_stop        = False
-	self.FLAG_stopped_at_sign = False # Have we seen a stop sign?
+        self.rc_msg = RCRaw()    
+        self.stopSgnDetected      = False
+        self.suppress_stop        = False
+        self.FLAG_stopped_at_sign = False # Have we seen a stop sign?
 
         # 7. FSM Vars
         self.set_FSM_vars()
@@ -273,7 +275,7 @@ class CarFSM:
         self.ocldScanNP = np.asarray( self.ocldScan )   
 
     def rc_cb( self , msg ):
-	""" Receive manual commands from the radio """
+    """ Receive manual commands from the radio """
         self.rc_msg = msg
         # Check for rc control override
         if self.rc_msg.values[6] > 1500:
@@ -301,16 +303,16 @@ class CarFSM:
         self.rc_steering = round((pi/2)*(self.rc_msg.values[0] - self.rc_steering_mid)/(self.rc_steering_max - self.rc_steering_min),2)
 
     def stop_cb( self , msg ):
-	""" Set the stop sign flag """
-	# 1. Collect the detection state
-	self.stopSgnDetected = msg.data
-	# 2. Overwrite the detection state if we wish to suppress
-	if self.suppress_stop:
-	    self.stopSgnDetected = False
-	    # 3. If the suppression time has expired, cease suppression
-	    if rospy.Time.now().to_sec() - self.stopped_begin_time > self.stop_suppress_duratn:
-		self.suppress_stop      = False
-		self.stopped_begin_time = 0.0
+        """ Set the stop sign flag """
+        # 1. Collect the detection state
+        self.stopSgnDetected = msg.data
+        # 2. Overwrite the detection state if we wish to suppress
+        if self.suppress_stop:
+            self.stopSgnDetected = False
+            # 3. If the suppression time has expired, cease suppression
+            if rospy.Time.now().to_sec() - self.stopped_begin_time > self.stop_suppress_duratn:
+            self.suppress_stop      = False
+            self.stopped_begin_time = 0.0
 
     def reset_time( self ):
         """ Set 'initTime' to the current time """
@@ -391,15 +393,15 @@ class CarFSM:
         self.recover_duration =  0.20 # Minimum time to recover
         self.recover_timeout  =  4.00 # Maximum time to recover
         self.K_p_backup       =  0.02 # Backup Kp, should be much less than forward as the dyn's are different
-	self.occlude_dist     =  1.0  # Maximum distance for which a scan reading is considered occluded
-	self.occlude_limit    = 33 # -- Minimum number of occluded scan readings that indicate view occlusion	
+        self.occlude_dist     =  1.0  # Maximum distance for which a scan reading is considered occluded
+        self.occlude_limit    = 33 # -- Minimum number of occluded scan readings that indicate view occlusion    
         # ~ STATE_seek_open ~
         self.seek_speed       =  0.10 # Creep forward at this speed
         self.K_p_creep        =  0.3 #- Fwd Kp, should be a little more than reverse to make sure we get around the foot/box
-	self.creep_scan_dist  =  2.0 #- Distance criterion to declare an unobstructed path
-	self.creep_scan_count = 66 # -- Count criterion to declare an unobstructed path
+        self.creep_scan_dist  =  2.0 #- Distance criterion to declare an unobstructed path
+        self.creep_scan_count = 66 # -- Count criterion to declare an unobstructed path
 
-	# ~~~ CAREFUL SETTINGS : For slow challenges && Emergency Backup stable lap settings ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # ~~~ CAREFUL SETTINGS : For slow challenges && Emergency Backup stable lap settings ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
         self._CAREFUL_SETTINGS = 0 # NOTE: SET TO 1 FOR { A. BOX RUN , B. STOP SIGN CHALLENGE? }
 
@@ -431,11 +433,11 @@ class CarFSM:
             self.seek_speed    = 0.10 # Creep forward at this speed
             self.K_p_creep     = 0.05 # Proportional gain for obstacle avoidance
             self.creep_timeout = 3.00 # Maximum time to recover
-	    # STATE_stop_for_sign
-	    self.stopped_begin_time   = 0.0
-	    self.cached_state         = self.STATE_init
-	    self.stopsign_duration    = 4.0	
-	    self.stop_suppress_duratn = 10.0
+            # STATE_stop_for_sign
+            self.stopped_begin_time   = 0.0
+            self.cached_state         = self.STATE_init
+            self.stopsign_duration    = 4.0    
+            self.stop_suppress_duratn = 10.0
 
     def eval_scan( self ):
         """ Populate the threshold array and return its center """
@@ -505,10 +507,10 @@ class CarFSM:
         msg.up              = self.currUp # ------- Proportional part of the control signal
         msg.ui              = self.currUi # ------- Integral part of the control signal
         msg.ud              = self.currUd # ------- Derivative part of the control signal
-	msg.turn_count      = self.turn_count # --- What turn is coming up?
-	msg.preturn_timer   = self.preturn_timer #- Drift timing
-	msg.forward_timer   = self.forward_timer #- Amount of time in straightaway
-	msg.turn_debounce   = self.turn_debounce #- Are we suppressing a turn count?	
+        msg.turn_count      = self.turn_count # --- What turn is coming up?
+        msg.preturn_timer   = self.preturn_timer #- Drift timing
+        msg.forward_timer   = self.forward_timer #- Amount of time in straightaway
+        msg.turn_debounce   = self.turn_debounce #- Are we suppressing a turn count?    
         # 3. Publish msg
         self.state_pub.publish( msg )
 
@@ -911,7 +913,7 @@ class CarFSM:
         if not self.FLAG_stopped_at_sign:
             self.FLAG_stopped_at_sign = True
             self.stopped_begin_time   = rospy.Time.now().to_sec()
-            self.cached_state         = self.prevState	
+            self.cached_state         = self.prevState    
         # ~  II. Set controls  ~
         self.linearSpeed = 0.0 # Obviously
         # ~ III. Transition Determination ~
@@ -926,22 +928,22 @@ class CarFSM:
             self.FLAG_stopped_at_sign = False # -------------- We done stopping
             self.suppress_stop        = True # --------------- Do not stop twice
             self.cached_state         = self.STATE_init # ---- Until it is overwritten
-	
-        # ~  IV. Clean / Update ~	
+    
+        # ~  IV. Clean / Update ~    
         self.reset_time() # Do not allow a stop to stall controls
-	    
+        
     def hallway_FSM( self ):
         """ Execute state actions and record current status """
         # NOTE: Each state must handle its own data collection, processing, control setting, and transition
-	self.prevState = self.state # Update previous
+        self.prevState = self.state # Update previous
         self.state() # ------ State actions and transition
-	if self.useStopDetect and self._CAREFUL_SETTINGS and self.stopSgnDetected:
-	    self.state  = self.STATE_stop_for_sign
-	    self.reason = "STOPSIGN_DETECTED"
-        self.report_state() # Publish state info
-        if self.state != self.prevState or ((rospy.Time.now().to_sec() - self.prntTime) > 0.5): # only print on transtion
-            print self.state.__name__ , ',' , self.reason , ',' , self.steerAngle , ',' , self.linearSpeed
-            self.prntTime = rospy.Time.now().to_sec()
+        if self.useStopDetect and self._CAREFUL_SETTINGS and self.stopSgnDetected:
+            self.state  = self.STATE_stop_for_sign
+            self.reason = "STOPSIGN_DETECTED"
+            self.report_state() # Publish state info
+            if self.state != self.prevState or ((rospy.Time.now().to_sec() - self.prntTime) > 0.5): # only print on transtion
+                print self.state.__name__ , ',' , self.reason , ',' , self.steerAngle , ',' , self.linearSpeed
+                self.prntTime = rospy.Time.now().to_sec()
         
 
     # ___ END FSM __________________________________________________________________________________________________________________________
