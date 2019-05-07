@@ -881,6 +881,11 @@ class CarFSM:
                     self.steerAngle = 1.5 # might need to ditch this....
                 else: 
                     self.linearSpeed = self.preturn_speed    
+
+                # Clamp steering to prevent indecision 
+                if  ( ( self.turn_count == 1 ) and ( self.clamp_turn1 ) )  or  ( ( self.turn_count == 2 ) and ( self.clamp_turn2 ) ):
+                    self.steerAngle = max( self.steerAngle , self.turn_clamp_right )
+
                 if self.enable_counter_steer:
                     if self.drift_start + self.counter_steer_start < self.preturn_timer < self.drift_start + self.counter_steer_stop:
                         self.steerAngle = self.counter_steer_angle
@@ -888,10 +893,7 @@ class CarFSM:
             else: 
                 self.linearSpeed = self.preturn_speed 
 
-        # Clamp steering to prevent indecision 
-        # FIXME: before or after countersteer?
-        if  ( ( self.turn_count == 1 ) and ( self.clamp_turn1 ) )  or  ( ( self.turn_count == 2 ) and ( self.clamp_turn2 ) ):
-            self.steerAngle = max( self.steerAngle , self.turn_clamp_right )
+        
 
         # ~ III. Transition Determination ~
         if self.FLAG_goodScan:
