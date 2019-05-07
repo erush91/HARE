@@ -369,20 +369,22 @@ class CarFSM:
         self.K_d_straight = self.K_d 
         self.K_i_straight = self.K_i
         # ~ STATE_preturn ~
-        self.preturn_max_thresh_dist_nrm = 8.25 + 2.25
-        self.preturn2_max_thresh_dist = self.preturn_max_thresh_dist_nrm + 1.20
+        self.preturn_max_thresh_dist_nrm = 8.25 - 2.25
+        self.preturn2_max_thresh_dist = self.preturn_max_thresh_dist_nrm + 3.20
+        if self.preturn2_max_thresh_dist > self.max_thresh_dist_nrm:
+            self.max_thresh_dist_nrm = self.preturn2_max_thresh_dist + 1.0
         self.preturn_max_thresh_dist = self.preturn_max_thresh_dist_nrm # set to make sure its defined initially
         self.right_side_boost = 2.5 # was 2 
         self.turns_cent_setpoint = int( self.numReadings/2 ) # Center of scan with an offset, a positive addition should push the car left
-        self.K_p_turn = 0.10 - 0.01
+        self.K_p_turn = 0.10 - 0.02
         self.K_p_t2   = 0.10
         self.preturn_speed = 0.13 # Speed for 'STATE_preturn' # 0.2 is a fast jog/run        
         self.tokyo_drift = True
         self.preturn_timer = 0.0
         # Drifting Vars
         self.drift_speed = 1.0 # full speed to break free tires
-        self.drift_start = 0.33 - 0.275 # 0.75 was this, setting to 0 to visualize when the steering angle trigger happens
-        self.drift_duration = 0.280 + 0.08 # 0.100 # milliseconds, set very high to ensure spotting the angle trigger
+        self.drift_start = 0.33 - 0.050 # 0.75 was this, setting to 0 to visualize when the steering angle trigger happens
+        self.drift_duration = 0.280 + 0.05 # 0.100 # milliseconds, set very high to ensure spotting the angle trigger
         self.t2_drift_duration = 0.280 - 0.06
         self.turn_based_drift = True
         self.drift_steer_trigger = 0.75 
@@ -776,7 +778,7 @@ class CarFSM:
         if self.turn_count > 1:
             self.straights_cent_setpoint = self.straights_cent_setpoint2
 
-        if rospy.Time.now().to_sec() - self.forward_timer < 1.5:
+        if rospy.Time.now().to_sec() - self.forward_timer < 0.5:
             self.sum_err = 0
 
         if self.dragOn:

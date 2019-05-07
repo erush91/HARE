@@ -26,7 +26,7 @@
     
     <!-- param name="P_VALUE" type="double" value="1.0000"/ --> <!-- 'wall_follow_state' controls on "meters" -->
     <param name="P_VALUE" type="double" value="0.030"/> <!-- 'hallway_FSM' controls on "indices" -->
-    <param name="I_VALUE" type="double" value="0.00012"/>
+    <param name="I_VALUE" type="double" value="0.00018"/>
     <param name="D_VALUE" type="double" value="0.054"/> 
 
     <!-- This should range from 0 - 1 -->
