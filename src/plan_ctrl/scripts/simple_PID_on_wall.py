@@ -359,13 +359,19 @@ class CarFSM:
         self.drag_speed = 0.5 
         self.drag_duration = 2.0 # seconds 
         self.straight_speed  = 0.32 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
-        # * TURN DETECTION *
+        
+        # * TURN TUNING *
         self.max_thresh_dist = 0.0
+        self.turn_clamp_right = 0.05
         # Turn 1
         self.turn1_max_thresh_dist = 9.25 - 0.50 # ---------- Above this value we consider distance to be maxed out [m]  # TODO: Try 8 for tighter turns
         self.max_thresh_dist = self.turn1_max_thresh_dist # Turn 1 only
+        self.clamp_turn1 = True
         # Turn 2
         self.turn2_max_thresh_dist = self.turn1_max_thresh_dist + 1.3
+        self.clamp_turn2 = False
+        # * TURN END *
+        
         self.thresh_count    = 5 # ------------ If there are at least this many readings above 'self.max_thresh_dist'    
         self.straights_cent_setpoint  = int( self.numReadings/2 )  + 4.0  # Center of scan with an offset, a positive addition should push the car left
         self.straights_cent_setpoint2 = int( self.numReadings/2 )  + 2.0
@@ -378,9 +384,13 @@ class CarFSM:
         self.K_p_turn = 0.10 - 0.00
         self.K_p_t2   = 0.10
         self.preturn_speed = 0.13 # Speed for 'STATE_preturn' # 0.2 is a fast jog/run        
-        self.tokyo_drift = True
         self.preturn_timer = 0.0
-        # Drifting Vars
+        
+        # ** Drifting Vars **
+        # Activation 
+        self.tokyo_drift = True
+        self.t1_drift_on = True
+        self.t2_drift_on = True
         self.drift_speed = 1.0 # full speed to break free tires
         self.drift_start = 0.33 - 0.230 # 0.75 was this, setting to 0 to visualize when the steering angle trigger happens
         self.drift_duration = 0.280 + 0.05 # 0.100 # milliseconds, set very high to ensure spotting the angle trigger
@@ -391,6 +401,8 @@ class CarFSM:
         self.counter_steer_angle = -1.0 # will need to tune this
         self.counter_steer_start = 0.400 # milliseconds of lag behind start of drift
         self.counter_steer_duration = 0.200
+        # * End Drift *
+        
         # ~ STATE_collide_recover ~
         self.recover_speed    = -0.15 # Back up at this speed
         self.recover_duration =  1.00 # Minimum time to recover
@@ -847,8 +859,17 @@ class CarFSM:
             self.currUp      = self.K_p_turn * translation_err
             auto_steer       = self.currUp
             self.steerAngle  = auto_steer # Control Effort
+            
             # --------- drifting code 
-            if self.tokyo_drift:
+            # A. Decide to drift , based on selection flags
+            if self.turn_count == 1:
+                driftNow = self.tokyo_drift and self.t1_drift_on
+            elif self.turn_count == 2:
+                driftNow = self.tokyo_drift and self.t2_drift_on
+            else:
+                driftNow = False
+            # B. If we have decided to drift, apply drift control
+            if driftNow:
                 if self.turn_based_drift: # reset the timer so it starts during the turn section
                     if self.currUp > self.drift_steer_trigger and self.one_shot: # start timer once the car begins its right turn
                         self.preturn_start_time = rospy.Time.now().to_sec()
@@ -859,15 +880,18 @@ class CarFSM:
                     self.linearSpeed = self.drift_speed
                     self.steerAngle = 1.5 # might need to ditch this....
                 else: 
-                    self.linearSpeed = self.preturn_speed
-                
+                    self.linearSpeed = self.preturn_speed    
                 if self.enable_counter_steer:
                     if self.drift_start + self.counter_steer_start < self.preturn_timer < self.drift_start + self.counter_steer_stop:
                         self.steerAngle = self.counter_steer_angle
-    
-            else: # --------- end drifting code 
+            # --------- end drifting code 
+            else: 
                 self.linearSpeed = self.preturn_speed 
 
+        # Clamp steering to prevent indecision 
+        # FIXME: before or after countersteer?
+        if  ( ( self.turn_count == 1 ) and ( self.clamp_turn1 ) )  or  ( ( self.turn_count == 2 ) and ( self.clamp_turn2 ) ):
+            self.steerAngle = max( self.steerAngle , self.turn_clamp_right )
 
         # ~ III. Transition Determination ~
         if self.FLAG_goodScan:
