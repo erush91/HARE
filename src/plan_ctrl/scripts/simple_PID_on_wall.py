@@ -358,7 +358,7 @@ class CarFSM:
         self.dragOn = 0
         self.drag_speed = 0.5 
         self.drag_duration = 2.0 # seconds 
-        self.straight_speed  = 0.32 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
+        self.straight_speed  = 0.36 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
         
         # * TURN TUNING *
         self.max_thresh_dist = 0.0
@@ -388,7 +388,7 @@ class CarFSM:
         
         # ** Drifting Vars **
         # Activation 
-        self.tokyo_drift = True
+        self.tokyo_drift = False
         self.t1_drift_on = True
         self.t2_drift_on = True
         self.drift_speed = 1.0 # full speed to break free tires
