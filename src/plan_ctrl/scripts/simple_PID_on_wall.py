@@ -362,10 +362,10 @@ class CarFSM:
         # * TURN DETECTION *
         self.max_thresh_dist = 0.0
         # Turn 1
-        self.turn1_max_thresh_dist = 9.25 # ---------- Above this value we consider distance to be maxed out [m]  # TODO: Try 8 for tighter turns
+        self.turn1_max_thresh_dist = 9.25 - 0.50 # ---------- Above this value we consider distance to be maxed out [m]  # TODO: Try 8 for tighter turns
         self.max_thresh_dist = self.turn1_max_thresh_dist # Turn 1 only
         # Turn 2
-        self.turn2_max_thresh_dist = self.turn1_max_thresh_dist + 1.0
+        self.turn2_max_thresh_dist = self.turn1_max_thresh_dist + 1.3
         self.thresh_count    = 5 # ------------ If there are at least this many readings above 'self.max_thresh_dist'    
         self.straights_cent_setpoint  = int( self.numReadings/2 )  + 4.0  # Center of scan with an offset, a positive addition should push the car left
         self.straights_cent_setpoint2 = int( self.numReadings/2 )  + 2.0
@@ -375,16 +375,16 @@ class CarFSM:
         # ~ STATE_preturn ~
         self.right_side_boost = 2.5 # was 2 
         self.turns_cent_setpoint = int( self.numReadings/2 ) # Center of scan with an offset, a positive addition should push the car left
-        self.K_p_turn = 0.10 - 0.02
+        self.K_p_turn = 0.10 - 0.00
         self.K_p_t2   = 0.10
         self.preturn_speed = 0.13 # Speed for 'STATE_preturn' # 0.2 is a fast jog/run        
         self.tokyo_drift = True
         self.preturn_timer = 0.0
         # Drifting Vars
         self.drift_speed = 1.0 # full speed to break free tires
-        self.drift_start = 0.33 - 0.050 # 0.75 was this, setting to 0 to visualize when the steering angle trigger happens
+        self.drift_start = 0.33 - 0.230 # 0.75 was this, setting to 0 to visualize when the steering angle trigger happens
         self.drift_duration = 0.280 + 0.05 # 0.100 # milliseconds, set very high to ensure spotting the angle trigger
-        self.t2_drift_duration = 0.280 - 0.06
+        self.t2_drift_duration = 0.280 - 0.08
         self.turn_based_drift = True
         self.drift_steer_trigger = 0.75 
         self.enable_counter_steer = True
