@@ -363,31 +363,32 @@ class CarFSM:
         self.turn2_max_thresh_dist = self.max_thresh_dist_nrm + 1.0
         self.max_thresh_dist = self.max_thresh_dist_nrm # set to make sure its defined initially
         self.thresh_count    = 5 # ------------ If there are at least this many readings above 'self.max_thresh_dist'    
-        self.straights_cent_setpoint = int( self.numReadings/2 )  + 4.0  # Center of scan with an offset, a positive addition should push the car left
+        self.straights_cent_setpoint  = int( self.numReadings/2 )  + 4.0  # Center of scan with an offset, a positive addition should push the car left
+        self.straights_cent_setpoint2 = int( self.numReadings/2 )  + 2.0
         self.K_p_straight = self.K_p        
         self.K_d_straight = self.K_d 
         self.K_i_straight = self.K_i
         # ~ STATE_preturn ~
-        self.preturn_max_thresh_dist_nrm = 8.25
-        self.preturn2_max_thresh_dist = self.preturn_max_thresh_dist_nrm + 3.20
+        self.preturn_max_thresh_dist_nrm = 8.25 + 2.25
+        self.preturn2_max_thresh_dist = self.preturn_max_thresh_dist_nrm + 1.20
         self.preturn_max_thresh_dist = self.preturn_max_thresh_dist_nrm # set to make sure its defined initially
         self.right_side_boost = 2.5 # was 2 
         self.turns_cent_setpoint = int( self.numReadings/2 ) # Center of scan with an offset, a positive addition should push the car left
-        self.K_p_turn = 0.10
+        self.K_p_turn = 0.10 - 0.01
         self.K_p_t2   = 0.10
         self.preturn_speed = 0.13 # Speed for 'STATE_preturn' # 0.2 is a fast jog/run        
         self.tokyo_drift = True
         self.preturn_timer = 0.0
         # Drifting Vars
         self.drift_speed = 1.0 # full speed to break free tires
-        self.drift_start = 0.33 + 0.10 # 0.75 was this, setting to 0 to visualize when the steering angle trigger happens
-        self.drift_duration = 0.280 + 0.02 # 0.100 # milliseconds, set very high to ensure spotting the angle trigger
-        self.t2_drift_duration = 0.280 + 0.02
+        self.drift_start = 0.33 - 0.275 # 0.75 was this, setting to 0 to visualize when the steering angle trigger happens
+        self.drift_duration = 0.280 + 0.08 # 0.100 # milliseconds, set very high to ensure spotting the angle trigger
+        self.t2_drift_duration = 0.280 - 0.06
         self.turn_based_drift = True
         self.drift_steer_trigger = 0.75 
         self.enable_counter_steer = True
         self.counter_steer_angle = -1.0 # will need to tune this
-        self.counter_steer_start = 0.200 # milliseconds of lag behind start of drift
+        self.counter_steer_start = 0.400 # milliseconds of lag behind start of drift
         self.counter_steer_duration = 0.200
         # ~ STATE_collide_recover ~
         self.recover_speed    = -0.15 # Back up at this speed
@@ -404,7 +405,7 @@ class CarFSM:
 
         # ~~~ CAREFUL SETTINGS : For slow challenges && Emergency Backup stable lap settings ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-        self._CAREFUL_SETTINGS = 1 # NOTE: SET TO 1 FOR { A. BOX RUN , B. STOP SIGN CHALLENGE? }
+        self._CAREFUL_SETTINGS = 0 # NOTE: SET TO 1 FOR { A. BOX RUN , B. STOP SIGN CHALLENGE? }
 
         # FROZEN SETTINGS FOR CALM DRIVING
         if self._CAREFUL_SETTINGS:
@@ -509,10 +510,10 @@ class CarFSM:
         msg.up              = self.currUp # ------- Proportional part of the control signal
         msg.ui              = self.currUi # ------- Integral part of the control signal
         msg.ud              = self.currUd # ------- Derivative part of the control signal
-        msg.turn_count      = self.turn_count # --- What turn is coming up?
-        msg.preturn_timer   = self.preturn_timer #- Drift timing
-        msg.forward_timer   = self.forward_timer #- Amount of time in straightaway
-        msg.turn_debounce   = self.turn_debounce #- Are we suppressing a turn count?    
+#        msg.turn_count      = int( self.turn_count ) # --- What turn is coming up?
+#        msg.preturn_timer   = self.preturn_timer #- Drift timing
+#        msg.forward_timer   = self.forward_timer #- Amount of time in straightaway
+#        msg.turn_debounce   = self.turn_debounce  #- Are we suppressing a turn count?    
         # 3. Publish msg
         self.state_pub.publish( msg )
 
@@ -772,6 +773,9 @@ class CarFSM:
         else: 
             self.max_thresh_dist = self.max_thresh_dist_nrm
 
+        if self.turn_count > 1:
+            self.straights_cent_setpoint = self.straights_cent_setpoint2
+
         if rospy.Time.now().to_sec() - self.forward_timer < 1.5:
             self.sum_err = 0
 
@@ -1025,11 +1029,11 @@ class CarFSM:
         # NOTE: Each state must handle its own data collection, processing, control setting, and transition
         self.prevState = self.state # Update previous
         self.state() # ------ State actions and transition
+        self.report_state() # Publish state info
         if self.useStopDetect and self._CAREFUL_SETTINGS and self.stopSgnDetected:
             self.state  = self.STATE_stop_for_sign
             self.reason = "STOPSIGN_DETECTED"
-            self.report_state() # Publish state info
-        if self.state != self.prevState or ((rospy.Time.now().to_sec() - self.prntTime) > 0.1): # only print on transtion
+        if self.state != self.prevState or ((rospy.Time.now().to_sec() - self.prntTime) > 0.5): # only print on transtion
             print self.state.__name__ , ',' , self.reason , ',' , self.steerAngle , ',' , self.linearSpeed
             self.prntTime = rospy.Time.now().to_sec()
         
@@ -1057,7 +1061,7 @@ class CarFSM:
 
             # 1. Calculate a control effort
             #self.FLAG_newCtrl = True # HACKKKKKKKKKKKKKKKKKKKKKKKKKK
-            if 0: # Enable Finite State Machine
+            if 1: # Enable Finite State Machine
                 self.hallway_FSM()
                 self.dampen_micro_cmds()
                 
