@@ -359,9 +359,13 @@ class CarFSM:
         self.drag_speed = 0.5 
         self.drag_duration = 2.0 # seconds 
         self.straight_speed  = 0.32 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
-        self.max_thresh_dist_nrm = 9.0 # ---------- Above this value we consider distance to be maxed out [m]  # TODO: Try 8 for tighter turns
-        self.turn2_max_thresh_dist = self.max_thresh_dist_nrm + 1.0
-        self.max_thresh_dist = self.max_thresh_dist_nrm # set to make sure its defined initially
+        # * TURN DETECTION *
+        self.max_thresh_dist = 0.0
+        # Turn 1
+        self.turn1_max_thresh_dist = 9.25 # ---------- Above this value we consider distance to be maxed out [m]  # TODO: Try 8 for tighter turns
+        self.max_thresh_dist = self.turn1_max_thresh_dist # Turn 1 only
+        # Turn 2
+        self.turn2_max_thresh_dist = self.turn1_max_thresh_dist + 1.0
         self.thresh_count    = 5 # ------------ If there are at least this many readings above 'self.max_thresh_dist'    
         self.straights_cent_setpoint  = int( self.numReadings/2 )  + 4.0  # Center of scan with an offset, a positive addition should push the car left
         self.straights_cent_setpoint2 = int( self.numReadings/2 )  + 2.0
@@ -369,11 +373,6 @@ class CarFSM:
         self.K_d_straight = self.K_d 
         self.K_i_straight = self.K_i
         # ~ STATE_preturn ~
-        self.preturn_max_thresh_dist_nrm = 8.25 - 2.25
-        self.preturn2_max_thresh_dist = self.preturn_max_thresh_dist_nrm + 3.20
-        if self.preturn2_max_thresh_dist > self.max_thresh_dist_nrm:
-            self.max_thresh_dist_nrm = self.preturn2_max_thresh_dist + 1.0
-        self.preturn_max_thresh_dist = self.preturn_max_thresh_dist_nrm # set to make sure its defined initially
         self.right_side_boost = 2.5 # was 2 
         self.turns_cent_setpoint = int( self.numReadings/2 ) # Center of scan with an offset, a positive addition should push the car left
         self.K_p_turn = 0.10 - 0.02
@@ -461,12 +460,8 @@ class CarFSM:
         else:
             self.FLAG_goodScan = False
             self.lastScanNP[-20:] = self.lastScanNP[-20:] + self.right_side_boost
-            self.above_thresh = np.where( self.lastScanNP > self.preturn_max_thresh_dist )[0]
             self.sorted_scan_inds = self.lastScanNP.argsort() # sorted from smallest to largest
             self.N_largest_inds = self.sorted_scan_inds[-self.num_largest:]
-            #if len( self.above_thresh ) >=self.thresh_count:
-            #    pass
-            #else: print('didnt expect this, could be a problem')
             
         if SHOWDEBUG:
             print "Scan: ___________" , self.lastScan
@@ -773,7 +768,7 @@ class CarFSM:
         if self.two_turn_gains and self.turn_count == 2:
             self.max_thresh_dist = self.turn2_max_thresh_dist
         else: 
-            self.max_thresh_dist = self.max_thresh_dist_nrm
+            self.max_thresh_dist = self.turn1_max_thresh_dist
 
         if self.turn_count > 1:
             self.straights_cent_setpoint = self.straights_cent_setpoint2
@@ -838,20 +833,12 @@ class CarFSM:
 
         # ~   I. State Calcs   ~
         self.preturn_timer = rospy.Time.now().to_sec() - self.preturn_start_time
-        #if self.preturn_timer > self.turn_count_db_dur and self.turn_debounce:
-        #    self.turn_count += 1 # increment the turn counter
         self.turn_debounce = False
         input_center  = self.eval_scan()
 
         # turn two specifics
         if self.two_turn_gains and self.turn_count >= 2:
-            self.preturn_max_thresh_dist = self.preturn2_max_thresh_dist
-            if self.preturn_max_thresh_dist > self.max_thresh_dist_nrm:
-                self.max_thresh_dist = self.preturn_max_thresh_dist 
             self.dirft_duration = self.t2_drift_duration
-        else:
-            self.preturn_max_thresh_dist = self.preturn_max_thresh_dist_nrm
-            
 
         # ~  II. Set controls  ~
         if self.FLAG_goodScan: pass # will transition below
