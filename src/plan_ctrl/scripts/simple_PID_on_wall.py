@@ -364,11 +364,11 @@ class CarFSM:
         self.max_thresh_dist = 0.0
         self.turn_clamp_right = 0.05
         # Turn 1
-        self.turn1_max_thresh_dist = 9.25 - 1.00 # ---------- Above this value we consider distance to be maxed out [m]  # TODO: Try 8 for tighter turns
+        self.turn1_max_thresh_dist = 9.25 - 0.75 # ---------- Above this value we consider distance to be maxed out [m]  # TODO: Try 8 for tighter turns
         self.max_thresh_dist = self.turn1_max_thresh_dist # Turn 1 only
         self.clamp_turn1 = True
         # Turn 2
-        self.turn2_max_thresh_dist = self.turn1_max_thresh_dist + 2.50
+        self.turn2_max_thresh_dist = self.turn1_max_thresh_dist + 2.5
         self.clamp_turn2 = True
         # * TURN END *
         
@@ -388,13 +388,13 @@ class CarFSM:
         
         # ** Drifting Vars **
         # Activation 
-        self.tokyo_drift = False
-        self.t1_drift_on = True
+        self.tokyo_drift = True
+        self.t1_drift_on = False
         self.t2_drift_on = True
         self.drift_speed = 1.0 # full speed to break free tires
-        self.drift_start = 0.33 - 0.230 # 0.75 was this, setting to 0 to visualize when the steering angle trigger happens
+        self.drift_start = 0.75 # 0.75 was this, setting to 0 to visualize when the steering angle trigger happens
         self.drift_duration = 0.280 + 0.05 # 0.100 # milliseconds, set very high to ensure spotting the angle trigger
-        self.t2_drift_duration = 0.280 - 0.105
+        self.t2_drift_duration = 0.200
         self.turn_based_drift = True
         self.drift_steer_trigger = 0.75 
         self.enable_counter_steer = True
@@ -1061,7 +1061,7 @@ class CarFSM:
                 True  - There is a sufficiently different command to publish
                 False - Microcommand, do not publish """
         if ( np.abs( self.steerAngle - self.prevSteerAngle ) > self.angleDiffMin )  or  ( not eq_margin( self.linearSpeed , self.prevLinarSpeed ) ) \
-        or ( rospy.Time.now().to_sec() - self.initTime < 0.25 ):
+        or ( rospy.Time.now().to_sec() - self.initTime < 0.75 ):
             self.prevSteerAngle = self.steerAngle
             self.prevLinarSpeed = self.linearSpeed
             self.FLAG_newCtrl   = True
