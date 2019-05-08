@@ -358,17 +358,17 @@ class CarFSM:
         self.dragOn = 0
         self.drag_speed = 0.5 
         self.drag_duration = 2.0 # seconds 
-        self.straight_speed  = 0.36 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
+        self.straight_speed  = 0.32 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
         
         # * TURN TUNING *
         self.max_thresh_dist = 0.0
         self.turn_clamp_right = 0.05
         # Turn 1
-        self.turn1_max_thresh_dist = 9.25 - 0.25 # ---------- Above this value we consider distance to be maxed out [m]  # TODO: Try 8 for tighter turns
+        self.turn1_max_thresh_dist = 9.25 - 1.00 # ---------- Above this value we consider distance to be maxed out [m]  # TODO: Try 8 for tighter turns
         self.max_thresh_dist = self.turn1_max_thresh_dist # Turn 1 only
         self.clamp_turn1 = True
         # Turn 2
-        self.turn2_max_thresh_dist = self.turn1_max_thresh_dist + 2.0
+        self.turn2_max_thresh_dist = self.turn1_max_thresh_dist + 2.50
         self.clamp_turn2 = True
         # * TURN END *
         
