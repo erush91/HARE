@@ -316,6 +316,7 @@ class CarFSM:
 
     def reset_time( self ):
         """ Set 'initTime' to the current time """
+        self.FLAG_newCtrl = True
         self.initTime = rospy.Time.now().to_sec() # Time that the node was "started"
 
     # === DRIVE FINITE STATE MACHINE =======================================================================================================
@@ -392,7 +393,7 @@ class CarFSM:
         self.t1_drift_on = False
         self.t2_drift_on = True
         self.drift_speed = 1.0 # full speed to break free tires
-        self.drift_start = 0.75 # 0.75 was this, setting to 0 to visualize when the steering angle trigger happens
+        self.drift_start = 0.50 # 0.75 was this, setting to 0 to visualize when the steering angle trigger happens
         self.drift_duration = 0.280 + 0.05 # 0.100 # milliseconds, set very high to ensure spotting the angle trigger
         self.t2_drift_duration = 0.200
         self.turn_based_drift = True
@@ -1061,7 +1062,7 @@ class CarFSM:
                 True  - There is a sufficiently different command to publish
                 False - Microcommand, do not publish """
         if ( np.abs( self.steerAngle - self.prevSteerAngle ) > self.angleDiffMin )  or  ( not eq_margin( self.linearSpeed , self.prevLinarSpeed ) ) \
-        or ( rospy.Time.now().to_sec() - self.initTime < 0.75 ):
+        or ( rospy.Time.now().to_sec() - self.initTime < 1.50 ):
             self.prevSteerAngle = self.steerAngle
             self.prevLinarSpeed = self.linearSpeed
             self.FLAG_newCtrl   = True
