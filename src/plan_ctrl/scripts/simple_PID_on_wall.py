@@ -381,7 +381,7 @@ class CarFSM:
         # ~ STATE_preturn ~
         self.right_side_boost = 2.5 # was 2 
         self.turns_cent_setpoint = int( self.numReadings/2 ) # Center of scan with an offset, a positive addition should push the car left
-        self.K_p_turn = 0.10 + 0.04
+        self.K_p_turn = 0.10 + 0.07
         self.K_p_t2   = 0.10
         self.preturn_speed = 0.13 # Speed for 'STATE_preturn' # 0.2 is a fast jog/run        
         self.preturn_timer = 0.0
