@@ -349,6 +349,9 @@ class CarFSM:
         self.creep_bgn_time  = 0.0 # ----------- 
         self.num_largest     = 15 # ------------ Fix number of largest vals to search for 
 
+        # < TEST SEQUENCE >
+        self.paramDex = 0
+
         # ~~ State-Specific Constants ~~
         self.two_turn_gains = True # modify some gains to account for the physical differences in the second turn
         self.turn_count = 0 # counts turns
@@ -359,10 +362,7 @@ class CarFSM:
         self.dragOn = 0
         self.drag_speed = 0.5 
         self.drag_duration = 2.0 # seconds 
-        self.straight_speed  = 0.32 # Speed for 'STATE_forward' # 0.2 is a fast jog/run
-
-        # < TEST SEQUENCE >
-        self.paramDex = 0
+        self.straight_speed  = [ 0.32 , 0.32 , 0.34 , 0.34 ][ self.paramDex ] # Speed for 'STATE_forward' # 0.2 is a fast jog/run
         
         # * TURN TUNING *
         self.max_thresh_dist = 0.0
@@ -394,7 +394,7 @@ class CarFSM:
         # Activation 
         self.tokyo_drift = True
         self.t1_drift_on = False
-        self.t2_drift_on = True
+        self.t2_drift_on = [ False , False , True , True ][ self.paramDex ]
         self.drift_speed = 1.0 # full speed to break free tires
         self.drift_start = 0.50 # 0.75 was this, setting to 0 to visualize when the steering angle trigger happens
         self.drift_duration = 0.280 + 0.05 # 0.100 # milliseconds, set very high to ensure spotting the angle trigger
