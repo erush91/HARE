@@ -362,7 +362,7 @@ class CarFSM:
         self.dragOn = 0
         self.drag_speed = 0.5 
         self.drag_duration = 2.0 # seconds 
-        self.straight_speed  = [ 0.32 , 0.32 , 0.34 , 0.34 ][ self.paramDex ] # Speed for 'STATE_forward' # 0.2 is a fast jog/run
+        self.straight_speed  = [ 0.32 , 0.32 , 0.32 , 0.32 ][ self.paramDex ] # Speed for 'STATE_forward' # 0.2 is a fast jog/run
         
         # * TURN TUNING *
         self.max_thresh_dist = 0.0
@@ -372,7 +372,7 @@ class CarFSM:
         self.max_thresh_dist = self.turn1_max_thresh_dist # Turn 1 only
         self.clamp_turn1 = True
         # Turn 2
-        self.turn2_max_thresh_dist = self.turn1_max_thresh_dist + 2.5
+        self.turn2_max_thresh_dist = self.turn1_max_thresh_dist + 2.0 # Turn detect too late cases 3/4
         self.clamp_turn2 = True
         # * TURN END *
         
@@ -385,14 +385,14 @@ class CarFSM:
         # ~ STATE_preturn ~
         self.right_side_boost = 2.5 # was 2 
         self.turns_cent_setpoint = int( self.numReadings/2 ) # Center of scan with an offset, a positive addition should push the car left
-        self.K_p_turn = [ 0.18 , 0.18 , 0.18 , 0.18 ][ self.paramDex ]
+        self.K_p_turn = [ 0.15 , 0.16 , 0.17 , 0.18 ][ self.paramDex ]
         self.K_p_t2   = 0.10
         self.preturn_speed = 0.13 # Speed for 'STATE_preturn' # 0.2 is a fast jog/run        
         self.preturn_timer = 0.0
         
         # ** Drifting Vars **
         # Activation 
-        self.tokyo_drift = True
+        self.tokyo_drift = False
         self.t1_drift_on = False
         self.t2_drift_on = [ False , False , True , True ][ self.paramDex ]
         self.drift_speed = 1.0 # full speed to break free tires
