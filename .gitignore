@@ -62,3 +62,5 @@ src/mitcar/scripts/halltest02_2019-04-12-14-00-36.bag
 *.ini
 */*/*/.goutputstream*
 src/mitcar/CATKIN_IGNORE
+Report/main.pdf
+Report/root.pdf

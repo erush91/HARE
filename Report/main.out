@@ -1,0 +1,26 @@
+\BOOKMARK [1][-]{section.1}{INTRODUCTION}{}% 1
+\BOOKMARK [2][-]{subsection.1.1}{Challenge Overview}{section.1}% 2
+\BOOKMARK [2][-]{subsection.1.2}{Course Overview}{section.1}% 3
+\BOOKMARK [1][-]{section.2}{RELATED WORK}{}% 4
+\BOOKMARK [1][-]{section.3}{METHODOLOGY}{}% 5
+\BOOKMARK [2][-]{subsection.3.1}{Provided Hardware}{section.3}% 6
+\BOOKMARK [2][-]{subsection.3.2}{System Design}{section.3}% 7
+\BOOKMARK [2][-]{subsection.3.3}{Sensors \046 Data Processing}{section.3}% 8
+\BOOKMARK [2][-]{subsection.3.4}{Control Strategy}{section.3}% 9
+\BOOKMARK [2][-]{subsection.3.5}{Drifting}{section.3}% 10
+\BOOKMARK [2][-]{subsection.3.6}{Collision Detection and Avoidance}{section.3}% 11
+\BOOKMARK [2][-]{subsection.3.7}{Stop Sign Detection}{section.3}% 12
+\BOOKMARK [1][-]{section.4}{RESULTS}{}% 13
+\BOOKMARK [2][-]{subsection.4.1}{Timed Trial Runs}{section.4}% 14
+\BOOKMARK [2][-]{subsection.4.2}{Stop Sign Detection}{section.4}% 15
+\BOOKMARK [2][-]{subsection.4.3}{Collision Detection and Recovery}{section.4}% 16
+\BOOKMARK [1][-]{section.5}{DISCUSSION}{}% 17
+\BOOKMARK [2][-]{subsubsection.5.0.1}{Control Gain and Parameter Tuning}{section.5}% 18
+\BOOKMARK [2][-]{subsection.5.1}{Sensors \046 Data Processing}{section.5}% 19
+\BOOKMARK [3][-]{subsubsection.5.1.1}{Stop Sign Detection}{subsection.5.1}% 20
+\BOOKMARK [1][-]{section.6}{CONCLUSIONS}{}% 21
+\BOOKMARK [2][-]{subsection.6.1}{Improving Performance through Deep Learning}{section.6}% 22
+\BOOKMARK [2][-]{subsection.6.2}{Comparing Two Control Approaches}{section.6}% 23
+\BOOKMARK [3][-]{figure.caption.23}{PID Feedback Control}{subsection.6.2}% 24
+\BOOKMARK [3][-]{figure.caption.24}{Finite State Machine}{subsection.6.2}% 25
+\BOOKMARK [1][-]{section*.27}{References}{}% 26
